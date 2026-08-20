@@ -1,0 +1,7 @@
+# LLM 配置模板。复制为 llm.yaml 后填入你自己的 API 信息。
+# llm.yaml 已在 .gitignore 中忽略，不会提交密钥。
+llm:
+  api_base: "https://api.openai.com/v1"   # OpenAI 兼容接口地址（可换成 DeepSeek / 通义 / Moonshot 等）
+  api_key: "sk-xxx"                        # 你的 API key
+  model: "gpt-4o-mini"                     # 模型名
+  timeout: 60                              # 请求超时（秒）

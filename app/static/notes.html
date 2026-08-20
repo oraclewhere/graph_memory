@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>graph_memory · 单词记忆图</title>
+<style>
+  :root {
+    --surface: #1a1a19;
+    --panel: #232322;
+    --panel-border: #3a3a38;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-3: #898781;
+    --blue-bright: #cde2fb;
+    --blue-dim: #3987e5;
+    --orange: #eb6834;
+    --good: #0ca30c;
+    --critical: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  header h1 { font-size: 22px; margin: 0 0 6px; }
+  header .sub { font-size: 13px; color: var(--ink-3); margin: 0 0 28px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 22px;
+    margin-bottom: 24px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 16px; color: var(--ink); }
+
+  .form-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .form-row input {
+    flex: 1; min-width: 140px; padding: 11px 13px; font-size: 14px;
+    background: #141414; color: var(--ink);
+    border: 1px solid var(--panel-border); border-radius: 8px; outline: none;
+  }
+  .form-row input:focus { border-color: var(--blue-bright); }
+  .form-row input.num { flex: 0 0 90px; min-width: 90px; }
+
+  button.primary {
+    padding: 11px 20px; font-size: 14px; font-weight: 600;
+    background: var(--blue-dim); color: #fff; border: none; border-radius: 8px; cursor: pointer;
+  }
+  button.primary:hover { background: #2f7ad4; }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* 收敛强度滑块 */
+  .intensity { margin: 18px 0 14px; }
+  .int-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13px; color: var(--ink-2); margin-bottom: 8px;
+  }
+  .int-head b { color: var(--blue-bright); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .intensity input[type=range] {
+    width: 100%; accent-color: var(--blue-dim); cursor: pointer; margin: 0;
+  }
+  .int-hint {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--ink-3); margin-top: 6px;
+  }
+  #seed-preview {
+    font-size: 12px; color: var(--ink-2); min-height: 17px; margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  #seed-preview .sd { color: var(--blue-bright); }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  button.ghost {
+    padding: 11px 20px; font-size: 14px; font-weight: 600;
+    background: transparent; color: var(--ink-2);
+    border: 1px solid var(--panel-border); border-radius: 8px; cursor: pointer;
+  }
+  button.ghost:hover { border-color: var(--blue-dim); color: var(--ink); }
+  button.ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #candidates { margin-top: 18px; border-top: 1px solid var(--panel-border); padding-top: 16px; }
+  .hidden { display: none; }
+  .cand-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; font-size: 13px; color: var(--ink-2);
+  }
+  #cand-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+  .cand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: 8px;
+    cursor: pointer; font-size: 14px;
+  }
+  .cand:hover { border-color: var(--blue-dim); }
+  .cand input { accent-color: var(--blue-dim); }
+  .cand-word { font-weight: 600; min-width: 90px; }
+  .cand-pos { font-size: 11px; color: var(--blue-bright); min-width: 40px; }
+  .cand-cn { color: var(--ink-2); flex: 1; }
+
+  .status { margin-top: 12px; font-size: 13px; min-height: 18px; }
+  .status.loading { color: var(--ink-3); }
+  .status.ok { color: var(--good); }
+  .status.err { color: var(--critical); }
+
+  #notes { display: flex; flex-direction: column; gap: 10px; }
+  .note {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 16px; border: 1px solid var(--panel-border); border-radius: 10px;
+    text-decoration: none; color: var(--ink); transition: border-color 0.15s;
+  }
+  .note:hover { border-color: var(--blue-dim); }
+  .note-main { display: flex; flex-direction: column; gap: 4px; }
+  .note-name { font-size: 15px; font-weight: 600; }
+  .note-desc { font-size: 12px; color: var(--ink-3); }
+  .note-meta { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+  .empty { font-size: 13px; color: var(--ink-3); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>graph_memory</h1>
+    <p class="sub">输入分类，拖动收敛强度，一轮轮长出一张单词记忆图</p>
+  </header>
+
+  <!-- 生成区 -->
+  <section class="card">
+    <h2>新建笔记</h2>
+    <div class="form-row">
+      <input id="category" placeholder="分类名（如：考研英语）" autocomplete="off">
+      <input id="description" placeholder="分类描述（可选）" autocomplete="off">
+      <input id="n-sentences" class="num" type="number" value="10" min="1" max="50" title="例句数">
+      <input id="n-seeds" class="num" type="number" value="5" min="1" max="20" title="种子数">
+    </div>
+
+    <div class="intensity">
+      <div class="int-head">
+        <span>收敛强度</span>
+        <b id="int-val">0.50</b>
+      </div>
+      <input id="intensity" type="range" min="0" max="100" value="50">
+      <div class="int-hint">
+        <span>← 扩张：挑边缘新词，拽出更多生词</span>
+        <span>收敛：挑核心高频词，加固关联 →</span>
+      </div>
+    </div>
+    <div id="seed-preview"></div>
+
+    <div class="btn-row">
+      <button id="btn-auto" class="primary">按强度自动生长一轮</button>
+      <button id="btn-candidates" class="ghost">手动挑种子</button>
+    </div>
+
+    <div id="candidates" class="hidden">
+      <div class="cand-head">
+        <span>勾选作为种子的单词：</span>
+        <button id="btn-generate" class="primary">生成图</button>
+      </div>
+      <div id="cand-list"></div>
+    </div>
+
+    <div id="gen-status" class="status"></div>
+  </section>
+
+  <!-- 笔记列表 -->
+  <section class="card">
+    <h2>我的笔记</h2>
+    <div id="notes"></div>
+    <div id="notes-empty" class="empty hidden">还没有笔记，先在上方生成一个吧</div>
+  </section>
+
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let candidates = [];  // 当前候选词 [{word, pos, definition_cn, definition_en}]
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+function setStatus(msg, cls) {
+  const el = $('gen-status');
+  el.textContent = msg;
+  el.className = 'status ' + (cls || '');
+}
+
+async function loadCategories() {
+  const notes = $('notes');
+  let cats = [];
+  try {
+    const res = await fetch('/api/categories').then((r) => r.json());
+    cats = res.categories || [];
+  } catch (e) {
+    cats = [];
+  }
+  notes.innerHTML = '';
+  $('notes-empty').classList.toggle('hidden', cats.length > 0);
+  for (const c of cats) {
+    const item = document.createElement('a');
+    item.className = 'note';
+    item.href = '/graph?category=' + encodeURIComponent(c.name);
+    const main = document.createElement('div');
+    main.className = 'note-main';
+    main.innerHTML = '<span class="note-name">' + escapeHtml(c.name) + '</span>' +
+      '<span class="note-desc">' + escapeHtml(c.description || '') + '</span>';
+    const meta = document.createElement('div');
+    meta.className = 'note-meta';
+    meta.textContent = c.word_count + ' 词 · ' + c.sentence_count + ' 例句';
+    item.appendChild(main);
+    item.appendChild(meta);
+    notes.appendChild(item);
+  }
+}
+
+// --- 收敛强度：高=收敛（挑核心词），低=扩张（挑边缘新词）---
+
+function intensityValue() {
+  return (parseInt($('intensity').value, 10) || 0) / 100;
+}
+
+function seedCount() {
+  return parseInt($('n-seeds').value, 10) || 5;
+}
+
+let previewTimer = null;
+
+function schedulePreview() {
+  $('int-val').textContent = intensityValue().toFixed(2);
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(previewSeeds, 250);
+}
+
+async function previewSeeds() {
+  const box = $('seed-preview');
+  const category = $('category').value.trim();
+  if (!category) { box.textContent = '输入分类名后可预览本轮会选中的种子'; return; }
+  try {
+    const q = '?category=' + encodeURIComponent(category) +
+      '&intensity=' + intensityValue() + '&k=' + seedCount();
+    const res = await fetch('/api/seeds' + q).then((r) => r.json());
+    if (res.cold_start) {
+      box.textContent = '「' + category + '」还没入图，这一轮将由 LLM 冷启动生成种子';
+      return;
+    }
+    box.innerHTML = '本轮种子：' + (res.words || [])
+      .map((w) => '<span class="sd">' + escapeHtml(w.text) + '</span>' +
+        '<span style="color:var(--ink-3)">(' + w.weight + '度)</span>')
+      .join('、');
+  } catch (e) {
+    box.textContent = '';
+  }
+}
+
+async function autoGrow() {
+  const category = $('category').value.trim();
+  if (!category) { setStatus('请输入分类名', 'err'); return; }
+  setStatus('正在按强度选种子并生成例句…（可能需几十秒）', 'loading');
+  $('btn-auto').disabled = true;
+  try {
+    const res = await fetch('/api/automake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: category,
+        seeds: [],                       // 空 = 让后端按强度自动选
+        n_sentences: parseInt($('n-sentences').value, 10) || 10,
+        description: $('description').value.trim(),
+        intensity: intensityValue(),
+        n_seeds: seedCount(),
+      }),
+    }).then((r) => r.json());
+    if (res.ok) {
+      setStatus('种子 ' + (res.seeds || []).join('、') + ' → ' +
+        res.sentences.length + ' 条例句，新增 ' + res.new_words.length + ' 个单词', 'ok');
+      await loadCategories();
+      await previewSeeds();   // 图变了，重算下一轮种子
+    } else {
+      setStatus('生成失败', 'err');
+    }
+  } catch (e) {
+    setStatus('生成失败：后端未响应或 LLM 未配置', 'err');
+  } finally {
+    $('btn-auto').disabled = false;
+  }
+}
+
+async function generateCandidates() {
+  const category = $('category').value.trim();
+  if (!category) { setStatus('请输入分类名', 'err'); return; }
+  setStatus('正在让 LLM 生成候选单词…（约需十几秒）', 'loading');
+  $('btn-candidates').disabled = true;
+  try {
+    const res = await fetch('/api/candidate-words', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: category, n: 10 }),
+    }).then((r) => r.json());
+    candidates = res.words || [];
+    renderCandidates();
+    setStatus('已生成 ' + candidates.length + ' 个候选单词，勾选后点「生成图」', 'ok');
+  } catch (e) {
+    setStatus('生成失败：后端未响应或 LLM 未配置', 'err');
+  } finally {
+    $('btn-candidates').disabled = false;
+  }
+}
+
+function renderCandidates() {
+  $('candidates').classList.toggle('hidden', candidates.length === 0);
+  const list = $('cand-list');
+  list.innerHTML = '';
+  candidates.forEach((w, i) => {
+    const label = document.createElement('label');
+    label.className = 'cand';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = true;
+    box.dataset.i = String(i);
+    const word = document.createElement('span');
+    word.className = 'cand-word';
+    word.textContent = w.word;
+    const pos = document.createElement('span');
+    pos.className = 'cand-pos';
+    pos.textContent = w.pos || '';
+    const cn = document.createElement('span');
+    cn.className = 'cand-cn';
+    cn.textContent = w.definition_cn || '';
+    label.appendChild(box);
+    label.appendChild(word);
+    label.appendChild(pos);
+    label.appendChild(cn);
+    list.appendChild(label);
+  });
+}
+
+async function generateGraph() {
+  const category = $('category').value.trim();
+  if (!category) { setStatus('请输入分类名', 'err'); return; }
+  const checked = [...document.querySelectorAll('#cand-list input:checked')]
+    .map((el) => candidates[Number(el.dataset.i)])
+    .filter(Boolean);
+  if (!checked.length) { setStatus('请至少勾选一个单词', 'err'); return; }
+  const nSentences = parseInt($('n-sentences').value, 10) || 10;
+  const description = $('description').value.trim();
+  setStatus('正在生成例句并构图…（可能需几十秒）', 'loading');
+  $('btn-generate').disabled = true;
+  try {
+    const res = await fetch('/api/automake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: category,
+        seeds: checked,
+        n_sentences: nSentences,
+        description: description,
+      }),
+    }).then((r) => r.json());
+    if (res.ok) {
+      setStatus('已生成：' + res.sentences.length + ' 条例句，新增 ' + res.new_words.length + ' 个单词', 'ok');
+      candidates = [];
+      renderCandidates();
+      $('category').value = '';
+      $('description').value = '';
+      await loadCategories();
+    } else {
+      setStatus('生成失败', 'err');
+    }
+  } catch (e) {
+    setStatus('生成失败：后端未响应', 'err');
+  } finally {
+    $('btn-generate').disabled = false;
+  }
+}
+
+$('btn-candidates').onclick = generateCandidates;
+$('btn-generate').onclick = generateGraph;
+$('btn-auto').onclick = autoGrow;
+$('intensity').oninput = schedulePreview;
+$('n-seeds').oninput = schedulePreview;
+$('category').oninput = schedulePreview;
+schedulePreview();
+loadCategories();
+</script>
+</body>
+</html>

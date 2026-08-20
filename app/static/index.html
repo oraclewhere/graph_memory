@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>graph_memory 单词记忆图</title>
+<script src="/static/cytoscape.min.js"></script>
+<style>
+  :root {
+    --surface: #1a1a19;
+    --panel: #232322;
+    --panel-border: #3a3a38;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-3: #898781;
+    --blue-bright: #cde2fb;
+    --blue-dim: #3987e5;
+    --orange: #eb6834;
+    --good: #0ca30c;
+    --critical: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+
+  #cy {
+    position: absolute;
+    inset: 0;
+  }
+
+  #topbar {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    pointer-events: none;
+  }
+  #topbar h1 { font-size: 15px; font-weight: 600; margin: 0; color: var(--ink); }
+  #topbar .hint { font-size: 12px; color: var(--ink-3); }
+  #topbar .back {
+    pointer-events: auto;
+    font-size: 13px;
+    color: var(--ink-2);
+    text-decoration: none;
+    padding: 4px 10px;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    background: var(--panel);
+  }
+  #topbar .back:hover { color: var(--ink); border-color: var(--blue-dim); }
+
+  #legend {
+    position: absolute;
+    left: 14px;
+    bottom: 14px;
+    z-index: 10;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--ink-2);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  #legend .row { display: flex; align-items: center; gap: 8px; }
+  #legend .bar {
+    width: 80px; height: 8px; border-radius: 4px;
+    background: linear-gradient(to right, var(--blue-dim), var(--blue-bright));
+  }
+  #legend .bar-labels {
+    display: flex; justify-content: space-between; width: 80px;
+    font-size: 10px; color: var(--ink-3);
+  }
+  #legend .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  #legend .sq { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  /* 填空面板：跟随点击的节点定位 */
+  #quiz-panel {
+    position: fixed;
+    width: 300px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 18px;
+    z-index: 20;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.65);
+    transition: opacity 0.15s ease;
+  }
+  #quiz-panel.hidden { opacity: 0; pointer-events: none; }
+  .quiz-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .quiz-label { font-size: 12px; color: var(--ink-3); letter-spacing: 0.5px; }
+  .panel-close { background: none; border: none; color: var(--ink-3); font-size: 20px; cursor: pointer; line-height: 1; }
+  .panel-close:hover { color: var(--ink); }
+  #quiz-pos { font-size: 12px; color: var(--blue-bright); margin-bottom: 6px; }
+  #quiz-hint { font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 4px; word-break: break-all; }
+  #quiz-def-en { font-size: 12px; color: var(--ink-3); margin-bottom: 14px; }
+  #quiz-input {
+    width: 100%; padding: 11px 13px; font-size: 16px;
+    background: #141414; color: var(--ink);
+    border: 1px solid var(--panel-border); border-radius: 8px; outline: none;
+  }
+  #quiz-input:focus { border-color: var(--blue-bright); }
+  #quiz-submit {
+    width: 100%; margin-top: 10px; padding: 11px; font-size: 15px; font-weight: 600;
+    background: var(--blue-dim); color: #fff; border: none; border-radius: 8px; cursor: pointer;
+  }
+  #quiz-submit:hover { background: #2f7ad4; }
+  #quiz-feedback { margin-top: 12px; font-size: 13px; min-height: 18px; }
+  #quiz-feedback.ok { color: var(--good); }
+  #quiz-feedback.err { color: var(--critical); }
+  #quiz-memory { margin-top: 6px; font-size: 11px; color: var(--ink-3); }
+
+  /* 例句面板：点击例句节点弹出，显示例句 + 翻译，句中单词可点击跳转 */
+  #sentence-panel {
+    position: fixed;
+    width: 340px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 18px;
+    z-index: 20;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.65);
+    transition: opacity 0.15s ease;
+  }
+  #sentence-panel.hidden { opacity: 0; pointer-events: none; }
+  #sentence-en { font-size: 17px; line-height: 1.7; color: var(--ink); margin: 6px 0 12px; }
+  #sentence-en .word-link {
+    color: var(--blue-bright);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  #sentence-en .word-link:hover { color: #ffffff; }
+  #sentence-zh { font-size: 13px; color: var(--ink-2); border-top: 1px solid var(--panel-border); padding-top: 10px; }
+
+  /* 错误弹窗 */
+  #modal {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.55);
+    z-index: 30; display: flex; align-items: center; justify-content: center;
+  }
+  #modal.hidden { display: none; }
+  .modal-card {
+    width: 320px; background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 12px; padding: 22px; text-align: center;
+  }
+  .modal-title { font-size: 17px; font-weight: 600; color: var(--critical); margin-bottom: 10px; }
+  #modal-answer { font-size: 15px; color: var(--ink-2); margin-bottom: 18px; min-height: 20px; }
+  #modal-answer b { color: var(--blue-bright); font-size: 18px; }
+  .modal-btns { display: flex; gap: 10px; }
+  .modal-btns button {
+    flex: 1; padding: 10px; font-size: 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--panel-border); background: #2b2b2a; color: var(--ink);
+  }
+  #btn-show-answer { background: var(--blue-dim); border-color: var(--blue-dim); font-weight: 600; }
+  #btn-show-answer:hover { background: #2f7ad4; }
+
+  #loading {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--ink-3); font-size: 14px; z-index: 5;
+  }
+</style>
+</head>
+<body>
+
+<div id="cy"></div>
+<div id="loading">加载图中…</div>
+
+<div id="topbar">
+  <a class="back" href="/">← 笔记列表</a>
+  <h1 id="title">graph_memory</h1>
+  <span class="hint">点击圆形单词填空 · 点击方形例句看内容</span>
+</div>
+
+<div id="legend">
+  <div class="row"><span class="bar"></span></div>
+  <div class="bar-labels"><span>记忆度低</span><span>记忆度高</span></div>
+  <div class="row"><span class="dot" style="background:#eb6834"></span> 分类</div>
+  <div class="row"><span class="dot" style="background:#3987e5"></span> 单词（圆形）</div>
+  <div class="row"><span class="sq" style="background:#3987e5"></span> 例句（方形，点击看内容、句中单词可跳转）</div>
+</div>
+
+<div id="quiz-panel" class="hidden">
+  <div class="quiz-head">
+    <span class="quiz-label">单词填空</span>
+    <button id="quiz-close" class="panel-close" title="关闭">×</button>
+  </div>
+  <div id="quiz-pos"></div>
+  <div id="quiz-hint"></div>
+  <div id="quiz-def-en"></div>
+  <input id="quiz-input" type="text" placeholder="输入英文单词，回车提交" autocomplete="off" spellcheck="false">
+  <button id="quiz-submit">提交</button>
+  <div id="quiz-feedback"></div>
+  <div id="quiz-memory"></div>
+</div>
+
+<div id="sentence-panel" class="hidden">
+  <div class="quiz-head">
+    <span class="quiz-label">例句</span>
+    <button id="sentence-close" class="panel-close" title="关闭">×</button>
+  </div>
+  <div id="sentence-en"></div>
+  <div id="sentence-zh"></div>
+</div>
+
+<div id="modal" class="hidden">
+  <div class="modal-card">
+    <div class="modal-title">✗ 填写错误</div>
+    <div id="modal-answer"></div>
+    <div class="modal-btns">
+      <button id="btn-retry">再试一次</button>
+      <button id="btn-show-answer">显示正确答案</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// 记忆度 → 亮度：单色蓝，从「记忆度低（暗）」到「记忆度高（亮）」
+const MEM_RAMP = ['#3987e5', '#5598e7', '#6da7ec', '#86b6ef', '#9ec5f4', '#b7d3f6', '#cde2fb'];
+
+function memColor(m) {
+  if (m == null) return '#3987e5';
+  const clamped = Math.max(0, Math.min(1, m));
+  const idx = Math.round(clamped * (MEM_RAMP.length - 1));
+  return MEM_RAMP[idx];
+}
+
+const state = { cy: null, current: null, pending: null, pendingAnswer: '', unfollowPanel: null };
+const $ = (id) => document.getElementById(id);
+
+const CATEGORY = new URLSearchParams(location.search).get('category');
+if (CATEGORY) $('title').textContent = CATEGORY;
+
+async function loadGraph() {
+  const url = CATEGORY ? '/api/graph?category=' + encodeURIComponent(CATEGORY) : '/api/graph';
+  const data = await fetch(url).then((r) => r.json());
+  buildCy(data);
+}
+
+function buildCy(data) {
+  const elements = [];
+  data.nodes.forEach((n) => {
+    const p = n.properties || {};
+    const text = p.text ?? p.name ?? '';
+    elements.push({
+      data: {
+        id: n.id,
+        label: n.label,
+        text: text,
+        pos: p.pos ?? '',
+        definition_cn: p.definition_cn ?? '',
+        definition_en: p.definition_en ?? '',
+        translation: p.translation ?? '',
+        words: p.words ?? [],
+        memory_strength: p.memory_strength ?? null,
+      },
+    });
+  });
+  data.edges.forEach((e, i) => {
+    elements.push({ data: { id: 'e' + i, source: e.source, target: e.target, type: e.type } });
+  });
+
+  state.cy = cytoscape({
+    container: $('cy'),
+    elements: elements,
+    style: [
+      {
+        selector: 'node',
+        style: {
+          'color': '#c3c2b7',
+          'font-size': 11,
+          'text-valign': 'bottom',
+          'text-margin-y': 6,
+          'text-wrap': 'ellipsis',
+          'text-max-width': '90px',
+        },
+      },
+      {
+        selector: 'node[label="Word"]',
+        style: {
+          'shape': 'ellipse',
+          'width': 30,
+          'height': 30,
+          'label': 'data(text)',
+          'background-color': (ele) => memColor(ele.data('memory_strength')),
+          'border-width': 1.5,
+          'border-color': 'rgba(255,255,255,0.35)',
+        },
+      },
+      {
+        selector: 'node[label="Sentence"]',
+        style: {
+          'shape': 'round-rectangle',
+          'width': 18,
+          'height': 18,
+          'label': '',
+          'background-color': (ele) => memColor(ele.data('memory_strength')),
+          'border-width': 1,
+          'border-color': 'rgba(255,255,255,0.35)',
+        },
+      },
+      {
+        selector: 'node[label="Category"]',
+        style: {
+          'shape': 'diamond',
+          'width': 46,
+          'height': 46,
+          'label': 'data(text)',
+          'font-size': 13,
+          'font-weight': 600,
+          'background-color': '#eb6834',
+          'border-width': 1.5,
+          'border-color': '#f0a37a',
+        },
+      },
+      {
+        selector: 'edge',
+        style: {
+          'width': 1,
+          'line-color': '#3a3a38',
+          'curve-style': 'bezier',
+          'target-arrow-shape': 'triangle',
+          'target-arrow-color': '#3a3a38',
+          'arrow-scale': 0.7,
+          'opacity': 0.7,
+        },
+      },
+      {
+        selector: 'node:selected',
+        style: { 'border-width': 3, 'border-color': '#ffffff' },
+      },
+      // 邻接高亮
+      { selector: '.dimmed', style: { 'opacity': 0.10 } },
+      { selector: 'edge.highlighted', style: { 'opacity': 1, 'line-color': '#cde2fb', 'target-arrow-color': '#cde2fb', 'width': 2.5 } },
+      { selector: 'node.highlighted', style: { 'opacity': 1 } },
+    ],
+    layout: {
+      name: 'cose',
+      animate: false,
+      nodeOverlap: 24,
+      nodeRepulsion: 9000,
+      idealEdgeLength: 90,
+      edgeElasticity: 90,
+      gravity: 0.25,
+      numIter: 1500,
+    },
+  });
+
+  state.cy.on('tap', 'node', onNodeTap);
+
+  $('loading').style.display = 'none';
+}
+
+function onNodeTap(evt) {
+  const node = evt.target;
+  const label = node.data('label');
+  if (label === 'Word') openQuiz(node);
+  else if (label === 'Sentence') openSentencePanel(node);
+}
+
+function highlight(node) {
+  const cy = state.cy;
+  cy.elements().removeClass('dimmed').removeClass('highlighted');
+  cy.elements().addClass('dimmed');
+  const related = node.closedNeighborhood(); // 自身 + 邻接节点 + 邻接边
+  related.removeClass('dimmed').addClass('highlighted');
+}
+
+function positionPanel(node, panel) {
+  const pos = node.renderedPosition(); // 相对 cy 容器（覆盖整个视口）
+  const pw = panel.offsetWidth;
+  const ph = panel.offsetHeight;
+  // 面板中心对齐节点，向上偏移一点，避免遮住下方输入
+  let left = pos.x - pw / 2;
+  let top = pos.y - ph / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+  top = Math.max(8, Math.min(top, window.innerHeight - ph - 8));
+  panel.style.left = left + 'px';
+  panel.style.top = top + 'px';
+}
+
+// 面板跟随节点：图平移/缩放时（含自动跳转的居中动画）持续对齐节点，避免偏移
+function bindPanelFollow(node, panel) {
+  const follow = () => positionPanel(node, panel);
+  state.cy.on('pan zoom', follow);
+  return () => state.cy.off('pan zoom', follow);
+}
+
+function unbindPanelFollow() {
+  if (state.unfollowPanel) { state.unfollowPanel(); state.unfollowPanel = null; }
+}
+
+function handleEscape() {
+  if (!$('modal').classList.contains('hidden')) {
+    $('modal').classList.add('hidden');
+    state.pending = null;
+  }
+  closeQuiz();
+  closeSentencePanel();
+}
+
+function openQuiz(node) {
+  state.current = node;
+  const defCn = node.data('definition_cn');
+  const defEn = node.data('definition_en');
+  $('quiz-pos').textContent = '词性：' + (node.data('pos') || '—');
+  $('quiz-hint').textContent = '中文释义：' + (defCn || '—');
+  $('quiz-def-en').textContent = '英文释义：' + (defEn || '—');
+  $('quiz-input').value = '';
+  setFeedback('', '');
+  updateMemoryLabel(node);
+  $('quiz-panel').classList.remove('hidden');
+  unbindPanelFollow();
+  state.unfollowPanel = bindPanelFollow(node, $('quiz-panel'));
+  $('quiz-input').focus();
+
+  state.cy.elements().unselect();
+  node.select();
+  highlight(node);
+  state.cy.animate({ center: { eles: node }, zoom: 1.1 }, { duration: 250 });
+}
+
+function updateMemoryLabel(node) {
+  const m = node.data('memory_strength');
+  $('quiz-memory').textContent = m != null ? ('记忆度 ' + Math.round(m * 100) + '%') : '';
+}
+
+function closeQuiz() {
+  $('quiz-panel').classList.add('hidden');
+  state.current = null;
+  state.cy.elements().removeClass('dimmed').removeClass('highlighted');
+  unbindPanelFollow();
+}
+
+function openSentencePanel(node) {
+  state.current = node;
+  const en = $('sentence-en');
+  en.innerHTML = '';
+  en.appendChild(renderSentenceText(node.data('text'), node.data('words') || []));
+  $('sentence-zh').textContent = node.data('translation') || '';
+  $('sentence-panel').classList.remove('hidden');
+  unbindPanelFollow();
+  state.unfollowPanel = bindPanelFollow(node, $('sentence-panel'));
+
+  state.cy.elements().unselect();
+  node.select();
+  highlight(node);
+  state.cy.animate({ center: { eles: node }, zoom: 1.1 }, { duration: 250 });
+}
+
+function closeSentencePanel() {
+  $('sentence-panel').classList.add('hidden');
+  state.current = null;
+  state.cy.elements().removeClass('dimmed').removeClass('highlighted');
+  unbindPanelFollow();
+}
+
+// 把英文句子按词切分，每个词拆成 [前缀标点, 字母核心, 后缀标点]，便于匹配词形
+function tokenize(text) {
+  return text.split(/\s+/).filter(Boolean).map((tok) => {
+    const m = tok.match(/^([^A-Za-z]*)([A-Za-z]+)([^A-Za-z]*)$/);
+    if (m) return { prefix: m[1], core: m[2], suffix: m[3], norm: m[2].toLowerCase() };
+    return { prefix: '', core: tok, suffix: '', norm: tok.toLowerCase() };
+  });
+}
+
+// 优先精确匹配，否则用最长前缀匹配（覆盖 passages→passage、analyzing→analyze）
+function matchWord(norm, words) {
+  if (words.includes(norm)) return norm;
+  let best = null;
+  for (const w of words) {
+    if (w.length >= 3 && norm.startsWith(w) && (!best || w.length > best.length)) best = w;
+  }
+  return best;
+}
+
+function renderSentenceText(text, words) {
+  const frag = document.createDocumentFragment();
+  tokenize(text).forEach((t) => {
+    if (t.prefix) frag.appendChild(document.createTextNode(t.prefix));
+    const matched = matchWord(t.norm, words);
+    if (matched) {
+      const span = document.createElement('span');
+      span.className = 'word-link';
+      span.textContent = t.core;
+      span.title = '跳到单词 ' + matched;
+      span.addEventListener('click', () => jumpToWord(matched));
+      frag.appendChild(span);
+    } else {
+      frag.appendChild(document.createTextNode(t.core));
+    }
+    if (t.suffix) frag.appendChild(document.createTextNode(t.suffix));
+    frag.appendChild(document.createTextNode(' '));
+  });
+  return frag;
+}
+
+function jumpToWord(wordText) {
+  const target = state.cy.getElementById('word:' + wordText);
+  if (!target.length) return;
+  closeSentencePanel();
+  openQuiz(target[0]);
+}
+
+function setFeedback(msg, cls) {
+  const el = $('quiz-feedback');
+  el.textContent = msg;
+  el.className = cls;
+}
+
+function submitAnswer() {
+  if (!state.current) return;
+  const input = $('quiz-input').value.trim().toLowerCase();
+  const answer = state.current.data('text').toLowerCase();
+  if (!input) return;
+
+  if (input === answer) {
+    setFeedback('记忆成功 ✓', 'ok');
+    markReviewed(state.current);
+  } else {
+    state.pending = state.current;
+    state.pendingAnswer = answer;
+    $('modal-answer').innerHTML = '';
+    $('modal').classList.remove('hidden');
+  }
+}
+
+async function markReviewed(node) {
+  const text = node.data('text');
+  let res;
+  try {
+    res = await fetch('/api/review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word: text }),
+    }).then((r) => r.json());
+  } catch (e) {
+    setFeedback('更新失败：后端未响应', 'err');
+    return;
+  }
+
+  node.data('memory_strength', res.memory_strength ?? 1.0);
+  state.cy.style().update();
+
+  const next = res.next;
+  if (next && next.text) {
+    const nextNode = state.cy.getElementById('word:' + next.text);
+    if (nextNode.length) {
+      setTimeout(() => openQuiz(nextNode[0]), 300);
+      return;
+    }
+  }
+  closeQuiz();
+}
+
+$('quiz-submit').onclick = submitAnswer;
+$('quiz-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitAnswer();
+});
+$('quiz-close').onclick = closeQuiz;
+$('sentence-close').onclick = closeSentencePanel;
+
+$('btn-retry').onclick = () => {
+  $('modal').classList.add('hidden');
+  $('quiz-input').value = '';
+  $('quiz-input').focus();
+  state.pending = null;
+};
+
+$('btn-show-answer').onclick = () => {
+  $('modal-answer').innerHTML = '正确答案：<b>' + state.pendingAnswer + '</b>';
+  const node = state.pending;
+  state.pending = null;
+  $('modal').classList.add('hidden');
+  setFeedback('已显示答案，记忆成功 ✓', 'ok');
+  markReviewed(node);
+};
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') handleEscape();
+});
+
+loadGraph().catch((e) => {
+  $('loading').textContent = '加载失败：请确认后端服务已启动（uvicorn app.main:app）';
+});
+</script>
+</body>
+</html>
