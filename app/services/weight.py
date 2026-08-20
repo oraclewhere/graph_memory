@@ -33,6 +33,7 @@ def select_seeds(
     category: str | None = None,
     intensity: float = DEFAULT_INTENSITY,
     k: int = 5,
+    exclude: set[str] | None = None,
 ) -> list[dict]:
     """按「收敛强度」在权重谱上取样，选出下一轮 autoMake 的种子单词。
 
@@ -51,9 +52,13 @@ def select_seeds(
     `category` 为空时在全图取样。该分类无单词（冷启动）时返回 []，
     由调用方回退到 LLM 生成种子（见 `AutoMake.pick_seeds`）。
 
+    `exclude` 里的词不参与取样（焦点词模式下用来排除焦点词自身，避免重复），
+    但仍参与归一化基准，保证「核心度」的标尺不因排除而漂移。
+
     返回 [{"text", "weight", "weight_norm", "distance"}, ...]，按取样优先级排序。
     """
     intensity = min(1.0, max(0.0, float(intensity)))
+    skip = {w.strip().lower() for w in (exclude or set())}
 
     if category:
         records = gdb.run(graph.CATEGORY_WORD_DEGREES, category=category)
@@ -66,6 +71,8 @@ def select_seeds(
 
     scored = []
     for r in records:
+        if r["text"] in skip:
+            continue
         w_norm = r["degree"] / max_w
         scored.append({
             "text": r["text"],
@@ -75,7 +82,9 @@ def select_seeds(
         })
     # 距离近的优先；同距离时偏高权重，再按字母序保证结果稳定可测
     scored.sort(key=lambda x: (x["distance"], -x["weight"], x["text"]))
-    return scored[:k] if k else scored
+    if k is None:
+        return scored
+    return scored[:max(0, k)]
 
 
 def rank_words(

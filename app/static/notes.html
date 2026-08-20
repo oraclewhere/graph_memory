@@ -59,34 +59,6 @@
   button.primary:hover { background: #2f7ad4; }
   button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* 收敛强度滑块 */
-  .intensity { margin: 18px 0 14px; }
-  .int-head {
-    display: flex; justify-content: space-between; align-items: baseline;
-    font-size: 13px; color: var(--ink-2); margin-bottom: 8px;
-  }
-  .int-head b { color: var(--blue-bright); font-size: 14px; font-variant-numeric: tabular-nums; }
-  .intensity input[type=range] {
-    width: 100%; accent-color: var(--blue-dim); cursor: pointer; margin: 0;
-  }
-  .int-hint {
-    display: flex; justify-content: space-between;
-    font-size: 11px; color: var(--ink-3); margin-top: 6px;
-  }
-  #seed-preview {
-    font-size: 12px; color: var(--ink-2); min-height: 17px; margin-bottom: 14px;
-    line-height: 1.5;
-  }
-  #seed-preview .sd { color: var(--blue-bright); }
-  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
-  button.ghost {
-    padding: 11px 20px; font-size: 14px; font-weight: 600;
-    background: transparent; color: var(--ink-2);
-    border: 1px solid var(--panel-border); border-radius: 8px; cursor: pointer;
-  }
-  button.ghost:hover { border-color: var(--blue-dim); color: var(--ink); }
-  button.ghost:disabled { opacity: 0.5; cursor: not-allowed; }
-
   #candidates { margin-top: 18px; border-top: 1px solid var(--panel-border); padding-top: 16px; }
   .hidden { display: none; }
   .cand-head {
@@ -129,7 +101,7 @@
 
   <header>
     <h1>graph_memory</h1>
-    <p class="sub">输入分类，拖动收敛强度，一轮轮长出一张单词记忆图</p>
+    <p class="sub">输入分类，让 LLM 生成种子单词，长出一张单词记忆图；进入图后可继续增词</p>
   </header>
 
   <!-- 生成区 -->
@@ -139,26 +111,8 @@
       <input id="category" placeholder="分类名（如：考研英语）" autocomplete="off">
       <input id="description" placeholder="分类描述（可选）" autocomplete="off">
       <input id="n-sentences" class="num" type="number" value="10" min="1" max="50" title="例句数">
-      <input id="n-seeds" class="num" type="number" value="5" min="1" max="20" title="种子数">
     </div>
-
-    <div class="intensity">
-      <div class="int-head">
-        <span>收敛强度</span>
-        <b id="int-val">0.50</b>
-      </div>
-      <input id="intensity" type="range" min="0" max="100" value="50">
-      <div class="int-hint">
-        <span>← 扩张：挑边缘新词，拽出更多生词</span>
-        <span>收敛：挑核心高频词，加固关联 →</span>
-      </div>
-    </div>
-    <div id="seed-preview"></div>
-
-    <div class="btn-row">
-      <button id="btn-auto" class="primary">按强度自动生长一轮</button>
-      <button id="btn-candidates" class="ghost">手动挑种子</button>
-    </div>
+    <button id="btn-candidates" class="primary">生成候选单词</button>
 
     <div id="candidates" class="hidden">
       <div class="cand-head">
@@ -221,78 +175,6 @@ async function loadCategories() {
     item.appendChild(main);
     item.appendChild(meta);
     notes.appendChild(item);
-  }
-}
-
-// --- 收敛强度：高=收敛（挑核心词），低=扩张（挑边缘新词）---
-
-function intensityValue() {
-  return (parseInt($('intensity').value, 10) || 0) / 100;
-}
-
-function seedCount() {
-  return parseInt($('n-seeds').value, 10) || 5;
-}
-
-let previewTimer = null;
-
-function schedulePreview() {
-  $('int-val').textContent = intensityValue().toFixed(2);
-  clearTimeout(previewTimer);
-  previewTimer = setTimeout(previewSeeds, 250);
-}
-
-async function previewSeeds() {
-  const box = $('seed-preview');
-  const category = $('category').value.trim();
-  if (!category) { box.textContent = '输入分类名后可预览本轮会选中的种子'; return; }
-  try {
-    const q = '?category=' + encodeURIComponent(category) +
-      '&intensity=' + intensityValue() + '&k=' + seedCount();
-    const res = await fetch('/api/seeds' + q).then((r) => r.json());
-    if (res.cold_start) {
-      box.textContent = '「' + category + '」还没入图，这一轮将由 LLM 冷启动生成种子';
-      return;
-    }
-    box.innerHTML = '本轮种子：' + (res.words || [])
-      .map((w) => '<span class="sd">' + escapeHtml(w.text) + '</span>' +
-        '<span style="color:var(--ink-3)">(' + w.weight + '度)</span>')
-      .join('、');
-  } catch (e) {
-    box.textContent = '';
-  }
-}
-
-async function autoGrow() {
-  const category = $('category').value.trim();
-  if (!category) { setStatus('请输入分类名', 'err'); return; }
-  setStatus('正在按强度选种子并生成例句…（可能需几十秒）', 'loading');
-  $('btn-auto').disabled = true;
-  try {
-    const res = await fetch('/api/automake', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        category: category,
-        seeds: [],                       // 空 = 让后端按强度自动选
-        n_sentences: parseInt($('n-sentences').value, 10) || 10,
-        description: $('description').value.trim(),
-        intensity: intensityValue(),
-        n_seeds: seedCount(),
-      }),
-    }).then((r) => r.json());
-    if (res.ok) {
-      setStatus('种子 ' + (res.seeds || []).join('、') + ' → ' +
-        res.sentences.length + ' 条例句，新增 ' + res.new_words.length + ' 个单词', 'ok');
-      await loadCategories();
-      await previewSeeds();   // 图变了，重算下一轮种子
-    } else {
-      setStatus('生成失败', 'err');
-    }
-  } catch (e) {
-    setStatus('生成失败：后端未响应或 LLM 未配置', 'err');
-  } finally {
-    $('btn-auto').disabled = false;
   }
 }
 
@@ -386,11 +268,6 @@ async function generateGraph() {
 
 $('btn-candidates').onclick = generateCandidates;
 $('btn-generate').onclick = generateGraph;
-$('btn-auto').onclick = autoGrow;
-$('intensity').oninput = schedulePreview;
-$('n-seeds').oninput = schedulePreview;
-$('category').oninput = schedulePreview;
-schedulePreview();
 loadCategories();
 </script>
 </body>

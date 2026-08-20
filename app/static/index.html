@@ -171,6 +171,71 @@
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     color: var(--ink-3); font-size: 14px; z-index: 5;
   }
+
+  /* 右上角「+」：为整张图增词 */
+  #grow-btn {
+    position: absolute; top: 14px; right: 14px; z-index: 12;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--blue-dim); color: #fff; border: none;
+    font-size: 22px; line-height: 1; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  #grow-btn:hover { background: #2f7ad4; }
+
+  /* 单词面板上的「+」：围绕该词造句 */
+  .head-btns { display: flex; align-items: center; gap: 2px; }
+  .panel-add {
+    background: none; border: none; color: var(--blue-bright);
+    font-size: 18px; cursor: pointer; line-height: 1; padding: 0 4px;
+  }
+  .panel-add:hover { color: #ffffff; }
+
+  /* 增词弹窗 */
+  #grow-modal {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.55);
+    z-index: 40; display: flex; align-items: center; justify-content: center;
+  }
+  #grow-modal.hidden { display: none; }
+  .grow-card {
+    width: 400px; background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 12px; padding: 22px;
+  }
+  .grow-title { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+  .grow-sub { font-size: 12px; color: var(--ink-3); line-height: 1.7; margin-bottom: 20px; }
+  .grow-sub b { color: var(--blue-bright); }
+  .grow-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13px; color: var(--ink-2); margin-bottom: 8px;
+  }
+  .grow-row b { color: var(--blue-bright); font-variant-numeric: tabular-nums; }
+  #grow-intensity { width: 100%; accent-color: var(--blue-dim); cursor: pointer; margin: 0; }
+  .grow-hint {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--ink-3); margin-top: 6px;
+  }
+  #grow-preview {
+    font-size: 12px; color: var(--ink-2); line-height: 1.7;
+    min-height: 36px; margin: 14px 0;
+  }
+  #grow-preview .sd { color: var(--blue-bright); }
+  #grow-preview .dg { color: var(--ink-3); }
+  .grow-n {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: var(--ink-2); margin-bottom: 16px;
+  }
+  .grow-n input {
+    width: 76px; padding: 8px 10px; font-size: 14px;
+    background: #141414; color: var(--ink);
+    border: 1px solid var(--panel-border); border-radius: 8px; outline: none;
+  }
+  .grow-n input:focus { border-color: var(--blue-bright); }
+  #grow-status { font-size: 12px; min-height: 17px; margin-bottom: 12px; }
+  #grow-status.loading { color: var(--ink-3); }
+  #grow-status.ok { color: var(--good); }
+  #grow-status.err { color: var(--critical); }
+  #grow-confirm { background: var(--blue-dim); border-color: var(--blue-dim); font-weight: 600; }
+  #grow-confirm:hover { background: #2f7ad4; }
+  #grow-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -181,8 +246,10 @@
 <div id="topbar">
   <a class="back" href="/">← 笔记列表</a>
   <h1 id="title">graph_memory</h1>
-  <span class="hint">点击圆形单词填空 · 点击方形例句看内容</span>
+  <span class="hint">点击圆形单词填空 · 点击方形例句看内容 · 右上角「＋」增词</span>
 </div>
+
+<button id="grow-btn" title="增加新的单词">＋</button>
 
 <div id="legend">
   <div class="row"><span class="bar"></span></div>
@@ -195,7 +262,10 @@
 <div id="quiz-panel" class="hidden">
   <div class="quiz-head">
     <span class="quiz-label">单词填空</span>
-    <button id="quiz-close" class="panel-close" title="关闭">×</button>
+    <span class="head-btns">
+      <button id="quiz-add" class="panel-add" title="用这个单词生成新例句">＋</button>
+      <button id="quiz-close" class="panel-close" title="关闭">×</button>
+    </span>
   </div>
   <div id="quiz-pos"></div>
   <div id="quiz-hint"></div>
@@ -213,6 +283,36 @@
   </div>
   <div id="sentence-en"></div>
   <div id="sentence-zh"></div>
+</div>
+
+<div id="grow-modal" class="hidden">
+  <div class="grow-card">
+    <div class="grow-title">是否增加新的单词？</div>
+    <div class="grow-sub" id="grow-sub"></div>
+
+    <div class="grow-row">
+      <span>例句对高权重单词的依赖程度</span>
+      <b id="grow-int-val">0.50</b>
+    </div>
+    <input id="grow-intensity" type="range" min="0" max="100" value="50">
+    <div class="grow-hint">
+      <span>← 少依赖：挑边缘生词，长出更多新词</span>
+      <span>多依赖：围绕核心高频词 →</span>
+    </div>
+
+    <div id="grow-preview"></div>
+
+    <div class="grow-n">
+      <label for="grow-n-sentences">新增例句数</label>
+      <input id="grow-n-sentences" type="number" value="5" min="1" max="30">
+    </div>
+
+    <div id="grow-status"></div>
+    <div class="modal-btns">
+      <button id="grow-cancel">取消</button>
+      <button id="grow-confirm">开始生成</button>
+    </div>
+  </div>
 </div>
 
 <div id="modal" class="hidden">
@@ -395,7 +495,7 @@ function positionPanel(node, panel) {
 function bindPanelFollow(node, panel) {
   const follow = () => positionPanel(node, panel);
   state.cy.on('pan zoom', follow);
-  return () => state.cy.off('pan zoom', follow);
+  return () => { if (state.cy) state.cy.off('pan zoom', follow); };
 }
 
 function unbindPanelFollow() {
@@ -403,6 +503,10 @@ function unbindPanelFollow() {
 }
 
 function handleEscape() {
+  if (!$('grow-modal').classList.contains('hidden')) {
+    closeGrowModal();
+    return;
+  }
   if (!$('modal').classList.contains('hidden')) {
     $('modal').classList.add('hidden');
     state.pending = null;
@@ -440,7 +544,8 @@ function updateMemoryLabel(node) {
 function closeQuiz() {
   $('quiz-panel').classList.add('hidden');
   state.current = null;
-  state.cy.elements().removeClass('dimmed').removeClass('highlighted');
+  // 刷新图期间 cy 会短暂为 null（reloadGraph 里 destroy 后、重建前）
+  if (state.cy) state.cy.elements().removeClass('dimmed').removeClass('highlighted');
   unbindPanelFollow();
 }
 
@@ -463,7 +568,7 @@ function openSentencePanel(node) {
 function closeSentencePanel() {
   $('sentence-panel').classList.add('hidden');
   state.current = null;
-  state.cy.elements().removeClass('dimmed').removeClass('highlighted');
+  if (state.cy) state.cy.elements().removeClass('dimmed').removeClass('highlighted');
   unbindPanelFollow();
 }
 
@@ -563,6 +668,133 @@ async function markReviewed(node) {
     }
   }
   closeQuiz();
+}
+
+// --- 增词：右上角「+」= 给整张图增词；单词面板「+」= 围绕该词造句 ---
+// 两者共用一个弹窗，区别只在有没有「焦点词」。
+// 滑块 = 例句对高权重单词的依赖程度：高则种子取核心高频词，低则取边缘生词。
+
+const grow = { focus: null, timer: null };
+const GROW_SEEDS = 5;   // 每轮种子数（焦点词模式下 = 焦点词 + 4 个陪衬词）
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+function growIntensity() {
+  return (parseInt($('grow-intensity').value, 10) || 0) / 100;
+}
+
+function setGrowStatus(msg, cls) {
+  const el = $('grow-status');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+
+function openGrowModal(focusWord) {
+  grow.focus = focusWord || null;
+  $('grow-sub').innerHTML = grow.focus
+    ? '围绕单词 <b>' + escapeHtml(grow.focus) + '</b> 生成新例句，句中出现的新词会自动入图。'
+    : '为「<b>' + escapeHtml(CATEGORY || '') + '</b>」生成新例句，句中出现的新词会自动入图。';
+  setGrowStatus('', '');
+  $('grow-modal').classList.remove('hidden');
+  previewGrowSeeds();
+}
+
+function closeGrowModal() {
+  $('grow-modal').classList.add('hidden');
+  grow.focus = null;
+}
+
+function scheduleGrowPreview() {
+  $('grow-int-val').textContent = growIntensity().toFixed(2);
+  clearTimeout(grow.timer);
+  grow.timer = setTimeout(previewGrowSeeds, 250);
+}
+
+async function previewGrowSeeds() {
+  $('grow-int-val').textContent = growIntensity().toFixed(2);
+  const box = $('grow-preview');
+  if (!CATEGORY) { box.textContent = ''; return; }
+  const q = new URLSearchParams({
+    category: CATEGORY,
+    intensity: String(growIntensity()),
+    k: String(GROW_SEEDS),
+  });
+  if (grow.focus) q.set('focus', grow.focus);
+  try {
+    const res = await fetch('/api/seeds?' + q).then((r) => r.json());
+    const parts = (res.words || []).map((w) =>
+      '<span class="sd">' + escapeHtml(w.text) + '</span><span class="dg">(' + w.weight + '度)</span>');
+    if (grow.focus) {
+      box.innerHTML = '种子：<span class="sd">' + escapeHtml(grow.focus) + '</span>（焦点）' +
+        (parts.length ? '，陪衬 ' + parts.join('、') : '');
+    } else if (res.cold_start) {
+      box.textContent = '该分类图里还没有单词，将由 LLM 冷启动生成种子';
+    } else {
+      box.innerHTML = '种子：' + parts.join('、');
+    }
+  } catch (e) {
+    box.textContent = '';
+  }
+}
+
+async function confirmGrow() {
+  if (!CATEGORY) return;
+  const focusWord = grow.focus;   // 请求期间弹窗可能被关，先存下来
+  setGrowStatus('正在生成例句并入图…（可能需几十秒）', 'loading');
+  $('grow-confirm').disabled = true;
+  try {
+    const res = await fetch('/api/automake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: CATEGORY,
+        seeds: [],                          // 空 = 交给后端按强度选
+        focus_word: focusWord || '',
+        intensity: growIntensity(),
+        n_seeds: GROW_SEEDS,
+        n_sentences: parseInt($('grow-n-sentences').value, 10) || 5,
+      }),
+    }).then((r) => r.json());
+    if (res.ok) {
+      setGrowStatus('新增 ' + res.new_words.length + ' 个单词、' +
+        res.sentences.length + ' 条例句，正在刷新图…', 'ok');
+      await reloadGraph();
+      closeGrowModal();
+    } else {
+      setGrowStatus('生成失败', 'err');
+    }
+  } catch (e) {
+    setGrowStatus('生成失败：后端未响应或 LLM 未配置', 'err');
+  } finally {
+    $('grow-confirm').disabled = false;
+  }
+}
+
+async function reloadGraph() {
+  closeQuiz();                 // 先收面板（此时 cy 还在）
+  closeSentencePanel();
+  if (state.cy) { state.cy.destroy(); state.cy = null; }
+  $('loading').textContent = '刷新图中…';
+  $('loading').style.display = 'flex';
+  await loadGraph();
+}
+
+$('grow-btn').onclick = () => openGrowModal(null);
+$('grow-cancel').onclick = closeGrowModal;
+$('grow-confirm').onclick = confirmGrow;
+$('grow-intensity').oninput = scheduleGrowPreview;
+$('quiz-add').onclick = () => {
+  if (state.current) openGrowModal(state.current.data('text'));
+};
+
+// 增词需要明确的分类（写库要落到某个 Category），整图视图下不提供
+if (!CATEGORY) {
+  $('grow-btn').style.display = 'none';
+  $('quiz-add').style.display = 'none';
 }
 
 $('quiz-submit').onclick = submitAnswer;

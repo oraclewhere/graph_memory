@@ -61,7 +61,7 @@ python -m pytest -k <name>                    # 单个用例
 1. 确保分类节点存在（`ensure_category`）。
 2. 确定种子单词，三条路径：
    - 调用方传入 `seeds`（前端手动勾选）；
-   - `pick_seeds(category, intensity, k)` **按收敛强度从图里自动选**（自生长主路径，见下「收敛强度」）；
+   - `pick_seeds(category, intensity, k, focus)` **按收敛强度从图里自动选**（自生长主路径，见下「收敛强度」；`focus` 非空时该词必定入选）；
    - 图里该分类还没有词（冷启动）时，`pick_seeds` 回退到 `llm.generate_top_words(requirement, n)`。
 3. 确保种子单词入图（`Word` 节点 + `BELONGS_TO` 边）。
 4. `llm.generate_sentences(seeds, category, n)` 生成 n 条该分类例句。
@@ -94,13 +94,17 @@ python -m pytest -k <name>                    # 单个用例
 - 分类在图中无词（冷启动）时返回 `[]`，由 `AutoMake.pick_seeds()` 回退 LLM。
 - 同距离时按「高权重优先 → 字母序」兜底，保证结果稳定可测。
 
+**焦点词模式**（`pick_seeds(..., focus="reform")`，图页面点单词上的「+」）：该词**必定**作为种子且排第一，其余 k-1 个「陪衬词」仍按强度取样（`select_seeds(exclude={focus})`）——强度高则陪核心高频词，强度低则陪边缘生词。焦点词本身就是合法种子，所以这条路**不走 LLM 冷启动**。`exclude` 的词不参与取样但仍参与归一化基准，避免「核心度」标尺漂移。
+
+**滑块该放哪**：强度只在图已经长出来之后才有意义——冷启动时 `select_seeds` 返回 `[]` 直接回退 LLM，滑块不起作用。所以滑块在**图页面**，不在首页。
+
 ### 查询接口（`app/api/routes.py`）
 
 - `GET /api/graph?category=` — 返回图 `{nodes, edges}`，Word 节点带实时记忆度；指定 `category` 时只返回该分类子图。
 - `GET /api/categories` — 返回所有分类及统计 `{categories: [{name, description, word_count, sentence_count}]}`（笔记列表用）。
 - `POST /api/candidate-words` — body `{category, n}`：让 LLM 生成候选种子单词（只调 LLM、不写库），返回 `{words}`，供半自动勾选。
-- `GET /api/seeds?category=&intensity=&k=` — 预览按收敛强度选出的种子（**只读图、不调 LLM、不写库**），返回 `{words: [{text, weight, weight_norm, distance}], intensity, cold_start}`，供前端滑块即时反馈。
-- `POST /api/automake` — body `{category, seeds, n_sentences, description, intensity, n_seeds}`：执行一轮 autoMake 并写库。**`seeds` 非空 = 用勾选的种子；`seeds` 为空 = 按 `intensity` 自动选种子**（图空则 LLM 冷启动）。返回 `{ok, auto_seeds, intensity, category, seeds, sentences, new_words}`。
+- `GET /api/seeds?category=&intensity=&k=&focus=` — 预览按收敛强度选出的种子（**只读图、不调 LLM、不写库**），返回 `{words: [{text, weight, weight_norm, distance}], intensity, focus, cold_start}`，供图页面滑块即时反馈。带 `focus` 时返回的是**陪衬词**（焦点词自身已从取样中排除，由前端展示）。
+- `POST /api/automake` — body `{category, seeds, n_sentences, description, intensity, n_seeds, focus_word}`：执行一轮 autoMake 并写库。三种模式：**`seeds` 非空 = 用勾选的种子**（首页新建笔记）；**`seeds` 为空 = 按 `intensity` 自动选种子**（图页面右上角「+」，图空则 LLM 冷启动）；**再带 `focus_word` = 焦点词模式**（图页面单词上的「+」）。返回 `{ok, auto_seeds, intensity, focus_word, category, seeds, sentences, new_words}`。
 - `GET /api/rank?limit=N` — 返回推送复习顺序（见上）。
 - `POST /api/review` — body `{"word": "..."}`：复习成功后重置该词记忆度，返回 `{ok, word, memory_strength, next}`（`next` 是下一个待复习词，即 rank 第一位）。
 - `GET /api/health` — 健康检查。
@@ -109,15 +113,18 @@ python -m pytest -k <name>                    # 单个用例
 
 两个单文件页面，均复用同一套暗色设计变量，用 Cytoscape.js（本地 `/static/cytoscape.min.js`，已下载进仓库）渲染力导向图：
 
-- **`notes.html`（首页 `/`）** — 笔记列表页，两种生长方式：
-  - **自动（主路径）**：输入分类 → 拖「收敛强度」滑块（左扩张 / 右收敛），滑块 `oninput` 防抖 250ms 调 `GET /api/seeds` 实时预览本轮种子及其度数 → 「按强度自动生长一轮」调 `POST /api/automake`（`seeds: []`）→ 生成后自动刷新预览，能直接看出图变了、下一轮种子换了。可反复点，即自生长。
-  - **手动（半自动）**：「手动挑种子」调 `POST /api/candidate-words` 渲染勾选列表 → 「生成图」调 `POST /api/automake`（带 `seeds`）。
-  - 笔记列表来自 `GET /api/categories`，一个分类一条，点击跳转 `/graph?category=...`。
+**职责划分：首页只管「从零建一张图」（冷启动），图页面才管「让图继续长」（增词）。**
+
+- **`notes.html`（首页 `/`）** — 笔记列表 + 新建笔记（冷启动，无滑块）。输入分类 → 「生成候选单词」调 `POST /api/candidate-words` 渲染勾选列表（半自动）→ 勾选后「生成图」调 `POST /api/automake`（带 `seeds`）→ 刷新笔记列表（`GET /api/categories`，一个分类一条）。点击笔记跳转 `/graph?category=...`。
 - **`index.html`（图视图 `/graph`）** — 读取 `?category=` 参数只显示该分类子图（无参数则整图）。交互：
   - **节点亮度 = 记忆度**：Word 节点用单一蓝色从暗（记忆度低）到亮（记忆度高），Category 橙色、Sentence 灰色。
   - **点击单词节点 → 中文释义填空英文**：面板跟随节点移动（绑定 `pan zoom`），填对或「显示正确答案」都调 `POST /api/review` 更新记忆度、节点变亮，并自动跳到 rank 返回的下一个待复习词。
   - **点击例句节点 → 弹窗**：显示英文例句 + 中文翻译 + 句内实词的「词性/中文释义/英文释义」，句中单词可点击跳转到对应 Word 节点；Esc 退出弹窗。
+  - **右上角「＋」→ 增词弹窗**：提示「是否增加新的单词？」，滑块 = **例句对高权重单词的依赖程度**（左=少依赖挑生词 / 右=多依赖挑核心词），`oninput` 防抖 250ms 调 `GET /api/seeds` 实时预览会选中哪些种子及其度数；确认后调 `POST /api/automake`（`seeds: []` + `intensity`），完成后 `reloadGraph()` 就地重建 Cytoscape 实例。
+  - **单词面板上的「＋」→ 同一弹窗的焦点词模式**：围绕当前单词造句，`focus_word` 带上该词，滑块此时控制陪衬词取核心词还是生词。
+  - 两个「＋」都需要明确分类（写库要落到某个 Category），**整图视图（无 `?category=`）下隐藏**。
   - **邻接高亮**：点击节点后其邻接节点高亮、其余变暗。
+  - `reloadGraph()` 期间 `state.cy` 会短暂为 `null`，`closeQuiz` / `closeSentencePanel` / 面板跟随回调都做了空值守卫。
 - 由 `main.py` 托管：`/` 返回 `notes.html`，`/graph` 返回 `index.html`，`/static/*` 服务静态资源，`/api/*` 走路由。
 
 ### 数据流向

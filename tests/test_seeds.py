@@ -118,3 +118,65 @@ def test_pick_seeds_cold_starts_with_llm_on_empty_graph():
 
     seeds = am.pick_seeds("新分类", intensity=0.5, k=3)
     assert [s.word for s in seeds] == ["from_llm"]
+
+
+# --- 焦点词模式：图页面点单词上的「+」，围绕该词造句 ---
+
+
+def _am(gdb):
+    return AutoMake(gdb, FakeLLM(top_words=[WordInfo(word="from_llm")]),
+                    AffixConfig(prefixes=[], suffixes=[]))
+
+
+def test_exclude_removes_word_from_sampling():
+    gdb = SeedGDB(AFTER_ONE_ROUND)
+    picked = select_seeds(gdb, category="c", intensity=1.0, k=1, exclude={"government"})
+    assert [p["text"] for p in picked] == ["promote"]   # 跳过被排除的核心词
+
+
+def test_exclude_keeps_normalization_scale_stable():
+    """排除某词不应改变归一化基准，否则「核心度」标尺会漂移。"""
+    gdb = SeedGDB(AFTER_ONE_ROUND)
+    picked = select_seeds(gdb, category="c", intensity=1.0, k=2, exclude={"government"})
+    # 基准仍是 government 的 10，所以 promote 还是 0.5，而不是被拉成 1.0
+    assert picked[0]["weight_norm"] == 0.5
+
+
+def test_zero_k_selects_nothing():
+    gdb = SeedGDB(AFTER_ONE_ROUND)
+    assert select_seeds(gdb, category="c", intensity=0.5, k=0) == []
+
+
+def test_focus_word_is_always_a_seed():
+    seeds = _am(SeedGDB(AFTER_ONE_ROUND)).pick_seeds("c", intensity=1.0, k=3, focus="reform")
+    assert seeds[0] == "reform"                        # 焦点词排第一且必定在
+    assert "reform" not in seeds[1:]                   # 不重复出现
+
+
+def test_focus_high_intensity_brings_core_companions():
+    """强度高 = 例句更依赖高权重词：陪衬词取核心词。"""
+    seeds = _am(SeedGDB(AFTER_ONE_ROUND)).pick_seeds("c", intensity=1.0, k=2, focus="reform")
+    assert seeds == ["reform", "government"]
+
+
+def test_focus_low_intensity_brings_peripheral_companions():
+    """强度低 = 例句少依赖高权重词：陪衬词取边缘词。"""
+    gdb = SeedGDB(AFTER_ONE_ROUND + [{"text": "edge", "degree": 1}])
+    seeds = _am(gdb).pick_seeds("c", intensity=0.0, k=2, focus="reform")
+    assert seeds == ["reform", "edge"]
+
+
+def test_focus_alone_when_k_is_one():
+    seeds = _am(SeedGDB(AFTER_ONE_ROUND)).pick_seeds("c", intensity=0.5, k=1, focus="reform")
+    assert seeds == ["reform"]                         # k=1 时没有陪衬词
+
+
+def test_focus_is_normalized_to_lowercase():
+    seeds = _am(SeedGDB(AFTER_ONE_ROUND)).pick_seeds("c", intensity=1.0, k=1, focus="  ReForm  ")
+    assert seeds == ["reform"]
+
+
+def test_focus_skips_llm_cold_start_on_empty_graph():
+    """图是空的但有焦点词时，焦点词本身就是合法种子，不该去调 LLM。"""
+    seeds = _am(SeedGDB([])).pick_seeds("c", intensity=0.5, k=3, focus="reform")
+    assert seeds == ["reform"]

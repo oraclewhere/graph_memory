@@ -73,6 +73,7 @@ class AutoMake:
         category: str,
         intensity: float = DEFAULT_INTENSITY,
         k: int = 5,
+        focus: str | None = None,
     ) -> list[WordInfo | str]:
         """按收敛强度自动选出本轮种子，无需人工勾选。
 
@@ -80,8 +81,23 @@ class AutoMake:
         多为上一轮新入图的词）——这一步把 `run()` 产出的 `new_words` 自动
         回灌成下一轮种子，闭合自生长循环。
 
-        该分类在图中还没有单词（冷启动）时，回退到 LLM 凭分类名生成种子。
+        `focus` 非空时进入**焦点词模式**（图页面点单词上的「+」）：该词必定作为
+        种子，其余 k-1 个「陪衬词」仍按强度取样——强度高则陪高权重核心词
+        （例句更依赖高频词），强度低则陪边缘生词（例句带出更多新词）。
+
+        该分类在图中还没有单词（冷启动）且无焦点词时，回退 LLM 凭分类名生成种子。
         """
+        focus_word = (focus or "").strip().lower()
+        if focus_word:
+            companions = select_seeds(
+                self.gdb,
+                category=category,
+                intensity=intensity,
+                k=max(0, k - 1),
+                exclude={focus_word},
+            )
+            return [focus_word] + [c["text"] for c in companions]
+
         picked = select_seeds(self.gdb, category=category, intensity=intensity, k=k)
         if picked:
             return [p["text"] for p in picked]

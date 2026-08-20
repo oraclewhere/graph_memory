@@ -33,6 +33,8 @@ class AutoMakeRequest(BaseModel):
     # 收敛强度：seeds 为空时按此强度从图里自动选种子（高=收敛，低=扩张）
     intensity: float = DEFAULT_INTENSITY
     n_seeds: int = 5
+    # 焦点词：非空则该词必定作为种子，其余按强度取样当陪衬（图页面点单词的「+」）
+    focus_word: str = ""
 
 
 @router.get("/health")
@@ -84,16 +86,30 @@ def seeds(
     category: str,
     intensity: float = DEFAULT_INTENSITY,
     k: int = 5,
+    focus: str = "",
 ) -> dict:
     """预览按收敛强度选出的种子单词（只读图、不调 LLM、不写库）。
 
     供前端滑块即时反馈：拖动强度就能看到这一轮会拿哪些词当种子。
-    分类还没入图时返回空列表，前端提示将由 LLM 冷启动。
+    `focus` 非空 = 焦点词模式，返回的是**陪衬词**（焦点词自身由前端展示，
+    已从取样中排除），此时不存在冷启动。分类还没入图时返回空列表。
     """
     gdb = db_module.GraphDB()
     try:
+        focus_word = focus.strip().lower()
+        if focus_word:
+            picked = select_seeds(
+                gdb,
+                category=category,
+                intensity=intensity,
+                k=max(0, k - 1),
+                exclude={focus_word},
+            )
+            return {"words": picked, "intensity": intensity,
+                    "focus": focus_word, "cold_start": False}
         picked = select_seeds(gdb, category=category, intensity=intensity, k=k)
-        return {"words": picked, "intensity": intensity, "cold_start": not picked}
+        return {"words": picked, "intensity": intensity,
+                "focus": "", "cold_start": not picked}
     finally:
         gdb.close()
 
@@ -102,9 +118,10 @@ def seeds(
 def automake(req: AutoMakeRequest) -> dict:
     """执行一轮 autoMake 并写库。
 
-    `seeds` 非空 = 用勾选的种子（半自动）；
-    `seeds` 为空 = 按 `intensity` 收敛强度从图里自动选种子（自生长），
-    图里该分类还没词时回退 LLM 冷启动。
+    `seeds` 非空 = 用勾选的种子（半自动，首页新建笔记用）；
+    `seeds` 为空 = 按 `intensity` 收敛强度从图里自动选种子（图页面「+」）；
+    再带上 `focus_word` = 焦点词模式（图页面点单词的「+」），该词必定入种子。
+    图里该分类还没词且无焦点词时，回退 LLM 冷启动。
     """
     gdb = db_module.GraphDB()
     try:
@@ -114,7 +131,12 @@ def automake(req: AutoMakeRequest) -> dict:
         am = AutoMake(gdb, llm, affixes)
         auto = not req.seeds
         seed_list = (
-            am.pick_seeds(req.category, intensity=req.intensity, k=req.n_seeds)
+            am.pick_seeds(
+                req.category,
+                intensity=req.intensity,
+                k=req.n_seeds,
+                focus=req.focus_word,
+            )
             if auto
             else req.seeds
         )
@@ -124,7 +146,13 @@ def automake(req: AutoMakeRequest) -> dict:
             n=req.n_sentences,
             description=req.description,
         )
-        return {"ok": True, "auto_seeds": auto, "intensity": req.intensity, **result}
+        return {
+            "ok": True,
+            "auto_seeds": auto,
+            "intensity": req.intensity,
+            "focus_word": req.focus_word if auto else "",
+            **result,
+        }
     finally:
         gdb.close()
 

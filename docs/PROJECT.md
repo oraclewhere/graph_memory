@@ -53,7 +53,7 @@ graph_memory/
 │       └── rumination.py      # 反刍（预留）
 └── tests/
     ├── test_automake.py       # autoMake 单元测试（FakeGraphDB + FakeLLM）
-    ├── test_seeds.py          # 收敛强度选种子单元测试（强度语义 + 冷启动回退）
+    ├── test_seeds.py          # 收敛强度选种子单元测试（强度语义 + 焦点词模式 + 冷启动回退）
     ├── test_memory.py         # 记忆度 + 推送排序单元测试
     └── test_graph_query.py    # 图结构查询单元测试（含子图过滤、例句记忆度均值）
 ```
@@ -228,11 +228,12 @@ def compute_weights(gdb):
 **收敛强度选种子**（`select_seeds`）——**自生长的方向盘**：
 
 ```python
-def select_seeds(gdb, category=None, intensity=0.5, k=5):
+def select_seeds(gdb, category=None, intensity=0.5, k=5, exclude=None):
     # 1. 取该分类内每个词的度中心性（CATEGORY_WORD_DEGREES），归一化到 0~1
     # 2. 取 |weight_norm - intensity| 最小的 k 个   ← 滑块停哪就从哪取种子
     # 3. 同距离时「高权重优先 → 字母序」兜底，保证稳定可测
     # 4. 该分类无词（冷启动）返回 []，由 AutoMake.pick_seeds 回退 LLM
+    # 5. exclude 里的词不参与取样（焦点词模式排除自身），但仍参与归一化基准
 ```
 
 | 强度 | 取到的词 | 效果 |
@@ -242,6 +243,18 @@ def select_seeds(gdb, category=None, intensity=0.5, k=5):
 | 低（→0）**扩张** | 度最低的边缘词（多为上一轮刚入图、只挂一条例句的新词） | 围着生词造句，拽出大量新词 → **图长大** |
 
 **闭环关键**：`run()` 产出的 `new_words` 入图后度最低，低强度下会被自动选成下一轮种子，**调用方不需要手动把 `new_words` 回灌**——这正是「新单词再作为种子」这半段循环的落地方式。
+
+**焦点词模式**（`pick_seeds(..., focus="reform")`）：图页面点某个单词上的「＋」时，该词**必定**作为种子且排第一，其余 k-1 个「陪衬词」仍按强度取样：
+
+```python
+if focus_word:
+    companions = select_seeds(gdb, category, intensity, k=k-1, exclude={focus_word})
+    return [focus_word] + [c["text"] for c in companions]
+```
+
+此时滑块的含义变成「这条例句要多依赖高权重词还是少依赖」——高则陪核心高频词，低则陪边缘生词。焦点词自身就是合法种子，所以这条路**不会触发 LLM 冷启动**。
+
+**滑块该放在哪一页**：强度只在图已经长出来之后才有意义——冷启动时图里一个词都没有，`select_seeds` 返回 `[]` 直接回退 LLM，滑块拖到哪都一样。所以滑块属于**图页面**（让已有的图继续长），不属于首页（从零建图）。
 
 **推送排序**（`rank_words`）：
 
@@ -294,8 +307,8 @@ memory_strength = e^(-Δt / half_life)
 | GET | `/api/graph?category=` | 返回图（可选子图），Word/Sentence 带实时记忆度 |
 | GET | `/api/categories` | 返回所有分类及统计（笔记列表） |
 | POST | `/api/candidate-words` | LLM 生成候选种子单词（只调 LLM、不写库），body `{category, n}` |
-| GET | `/api/seeds?category=&intensity=&k=` | 预览按收敛强度选出的种子（只读图、不调 LLM），返回 `{words, intensity, cold_start}` |
-| POST | `/api/automake` | 执行一轮 autoMake 并写库，body `{category, seeds, n_sentences, description, intensity, n_seeds}`；`seeds` 为空即按强度自动选种子 |
+| GET | `/api/seeds?category=&intensity=&k=&focus=` | 预览按收敛强度选出的种子（只读图、不调 LLM），返回 `{words, intensity, focus, cold_start}`；带 `focus` 时返回陪衬词 |
+| POST | `/api/automake` | 执行一轮 autoMake 并写库，body `{category, seeds, n_sentences, description, intensity, n_seeds, focus_word}`；`seeds` 为空即按强度自动选种子，再带 `focus_word` 即焦点词模式 |
 | GET | `/api/rank?limit=N` | 返回推送复习顺序（见 3.4） |
 | POST | `/api/review` | 复习成功重置记忆度，返回下一个待复习词 |
 | GET | `/api/health` | 健康检查 |
@@ -304,21 +317,26 @@ memory_strength = e^(-Δt / half_life)
 
 两个单文件页面，复用同一套暗色设计变量，用 Cytoscape.js（已本地化到 `static/cytoscape.min.js`）：
 
-**`notes.html`（首页 `/`）—— 笔记列表 + 自生长控制台**
+**职责划分**：首页只管「从零建一张图」（冷启动，无滑块），图页面才管「让图继续长」（增词，有滑块）。
 
-- **收敛强度滑块（主路径）**：拖动滑块（左「扩张：挑边缘新词」↔ 右「收敛：挑核心高频词」），`oninput` 防抖 250ms 调 `GET /api/seeds`，**实时显示本轮会选中哪些种子及其度数**；点「按强度自动生长一轮」以 `seeds: []` 调 `POST /api/automake`，后端按强度选种子。生成后自动重算预览——能直观看到图长大后下一轮种子换了，反复点即自生长。
-- **手动挑种子（半自动）**：点「手动挑种子」调 `POST /api/candidate-words` 渲染勾选列表（词性 + 中文释义），勾选后「生成图」调 `POST /api/automake`（带 `seeds`，此时忽略强度）。
-- 分类未入图时预览提示「将由 LLM 冷启动生成种子」。
+**`notes.html`（首页 `/`）—— 笔记列表 + 新建笔记（冷启动）**
+
+- 输入分类 + 可选描述 + 例句数，「生成候选单词」调 `POST /api/candidate-words`，把返回的候选渲染成带勾选列表（词性 + 中文释义）。
+- 勾选种子后点「生成图」调 `POST /api/automake`（带 `seeds`），成功后刷新笔记列表。
 - 笔记列表来自 `GET /api/categories`，一个分类一条笔记（显示名称、描述、单词数、例句数），点击跳转 `/graph?category=<分类名>`。
 
-**`index.html`（图视图 `/graph`）—— 子图可视化 + 填空记忆闭环**
+**`index.html`（图视图 `/graph`）—— 子图可视化 + 填空记忆闭环 + 增词**
 
 - 读取 `?category=` 参数只显示该分类子图（无参数则整图）。
 - **节点亮度 = 记忆度**：Word 节点用单一蓝色从暗（记忆度低）到亮（记忆度高）；Category 橙色、Sentence 灰色。
 - **点击单词节点**：右侧浮出填空面板（显示「词性 / 中文释义 / 英文释义」），面板跟随节点移动（绑定 `pan zoom`），用户填英文提交。
 - **答对**：调 `POST /api/review` 重置记忆度 → 节点变亮 → 自动跳到 rank 返回的下一个待复习词；**答错**弹窗询问「显示正确答案 / 再试一次」。
 - **点击例句节点**：弹窗显示英文例句 + 中文翻译 + 句内实词（词性/中英释义），句中单词可点击跳转到对应 Word 节点；Esc 退出。
+- **右上角「＋」——给整张图增词**：弹窗提示「是否增加新的单词？」，滑块标注为「例句对高权重单词的依赖程度」（左「少依赖：挑边缘生词，长出更多新词」↔ 右「多依赖：围绕核心高频词」），`oninput` 防抖 250ms 调 `GET /api/seeds` **实时显示会选中哪些种子及其度数**；确认后以 `seeds: []` + `intensity` 调 `POST /api/automake`，完成后 `reloadGraph()` 销毁并重建 Cytoscape 实例，新长出来的词立刻出现在图上。
+- **单词面板上的「＋」——围绕该词造句**：复用同一个弹窗，额外带 `focus_word`，滑块此时控制陪衬词取核心词还是生词。
+- 两个「＋」都需要明确分类（写库要落到某个 Category），**整图视图（URL 无 `?category=`）下隐藏**。
 - **邻接高亮**：点击节点后其邻接节点高亮、其余变暗。
+- `reloadGraph()` 期间 `state.cy` 会短暂为 `null`（destroy 后、重建前），`closeQuiz` / `closeSentencePanel` / 面板跟随解绑回调都加了空值守卫，避免此刻按 Esc 抛错。
 
 ---
 
@@ -424,12 +442,17 @@ POST /api/automake        ──► services/automake.py ──► 一轮自生�
 GET /api/rank             ──► services/weight.py + memory.py ──► 重要度 × 遗忘比例 排序
 ```
 
-**自生长闭环**：
+**自生长闭环**（滑块在图页面，两个「＋」都进这个环）：
 
 ```
-        收敛强度滑块
-             │
-             ▼
+   图页面右上角「＋」          单词面板「＋」
+   （整图增词）               （焦点词模式，该词必定入选）
+             │                        │
+             └──────────┬─────────────┘
+                        ▼
+                   收敛强度滑块
+                        │
+                        ▼
    select_seeds（按权重谱取样）──► 种子单词
              ▲                        │
              │                        ▼
