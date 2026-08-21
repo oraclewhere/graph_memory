@@ -1189,11 +1189,12 @@ $('btn-retry').onclick = () => {
 
 $('btn-show-answer').onclick = () => {
   $('modal-answer').innerHTML = '正确答案：<b>' + state.pendingAnswer + '</b>';
-  const node = state.pending;
   state.pending = null;
   $('modal').classList.add('hidden');
-  setFeedback('已显示答案，记忆成功 ✓', 'ok');
-  markReviewed(node);
+  // 显示答案不算复习成功，不跳转下一个，让用户继续复习这个词
+  setFeedback('已显示答案，请记忆后再次尝试', '');
+  $('quiz-input').value = '';
+  $('quiz-input').focus();
 };
 
 document.addEventListener('keydown', (e) => {
