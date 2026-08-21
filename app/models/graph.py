@@ -82,10 +82,12 @@ GET_ALL_WORDS_FULL = "MATCH (w:Word) RETURN w"
 GET_ALL_SENTENCES = "MATCH (s:Sentence) RETURN s"
 
 # 所有边：a_label/a_key 标识起点（Word/Sentence 用 text，Category 用 name）
+# 新增：返回 r.affix 属性（SHARES_PREFIX/SHARES_SUFFIX 边有该属性）
 GET_ALL_RELATIONSHIPS = (
     "MATCH (a)-[r]->(b) "
     "RETURN labels(a)[0] AS a_label, coalesce(a.text, a.name) AS a_key, "
-    "labels(b)[0] AS b_label, coalesce(b.text, b.name) AS b_key, type(r) AS type"
+    "labels(b)[0] AS b_label, coalesce(b.text, b.name) AS b_key, type(r) AS type, "
+    "r.affix AS affix"
 )
 
 # 记忆度计算需要的时间锚点

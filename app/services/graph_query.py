@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from app import db as db_module
+from app.config import AffixConfig, load_affix_config
 from app.models import graph
 from app.services.memory import DEFAULT_HALF_LIFE_DAYS, memory_strength_at
 
@@ -12,6 +13,7 @@ def get_graph(
     gdb: db_module.GraphDB,
     half_life_days: float = DEFAULT_HALF_LIFE_DAYS,
     category: str | None = None,
+    affixes: AffixConfig | None = None,
 ) -> dict:
     """导出图结构：{"nodes": [...], "edges": [...]}。
 
@@ -92,16 +94,50 @@ def get_graph(
         node_ids.update(sn["id"] for sn in sentence_nodes)
     sent_sum: dict[str, tuple[float, int]] = {}
     sent_words: dict[str, set[str]] = {}
+
+    # 加载词缀配置（用于边上显示词缀含义）
+    if affixes is None:
+        affixes = load_affix_config()
+
     for r in gdb.run(graph.GET_ALL_RELATIONSHIPS):
         source = f"{str(r['a_label']).lower()}:{r['a_key']}"
         target = f"{str(r['b_label']).lower()}:{r['b_key']}"
         if node_ids is not None and (source not in node_ids or target not in node_ids):
             continue
-        edges.append({
+
+        edge_data = {
             "source": source,
             "target": target,
             "type": r["type"],
-        })
+        }
+
+        # 对于词缀边，查找词缀含义并构造 display_label
+        affix = r.get("affix")
+        if affix and r["type"] in ("SHARES_PREFIX", "SHARES_SUFFIX"):
+            if r["type"] == "SHARES_PREFIX":
+                info = affixes.get_prefix_meaning(affix)
+                suffix_char = "-"  # 前缀显示为 "un-"
+            else:
+                info = affixes.get_suffix_meaning(affix)
+                suffix_char = "-"  # 后缀显示为 "-tion"
+
+            if info:
+                meaning_cn = info.meaning_cn
+                # 构造显示标签：前缀 "un-" 或后缀 "-tion"，带中文含义
+                if r["type"] == "SHARES_PREFIX":
+                    display_label = f"{affix}-{meaning_cn}" if meaning_cn else affix
+                else:
+                    display_label = f"-{affix} {meaning_cn}" if meaning_cn else affix
+            else:
+                display_label = affix
+
+            edge_data["affix"] = affix
+            edge_data["meaning_cn"] = meaning_cn if info else ""
+            edge_data["meaning_en"] = info.meaning_en if info else ""
+            edge_data["display_label"] = display_label
+
+        edges.append(edge_data)
+
         if r["type"] == "CONTAINS":
             sent_text = r["a_key"]  # Sentence 的 text
             word_text = r["b_key"]  # Word 的 text

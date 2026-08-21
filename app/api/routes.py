@@ -47,7 +47,8 @@ def graph_structure(category: str | None = None) -> dict:
     """返回图结构（节点 + 边）；指定 category 时只返回该分类的子图。"""
     gdb = db_module.GraphDB()
     try:
-        return graph_query.get_graph(gdb, category=category)
+        affixes = load_affix_config()
+        return graph_query.get_graph(gdb, category=category, affixes=affixes)
     finally:
         gdb.close()
 

@@ -302,11 +302,30 @@
   }
   .res-chip:hover { border-color: var(--blue-dim); color: #fff; }
   #res-none { font-size: 12px; color: var(--ink-3); }
+
+  /* 边 tooltip：hover 边时弹出，显示词缀含义 */
+  #edge-tooltip {
+    position: fixed;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--ink);
+    z-index: 25;
+    pointer-events: none;  /* 避免 tooltip 挡住鼠标事件 */
+    max-width: 220px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  #edge-tooltip.hidden { display: none; }
+  #edge-tooltip .et-title { color: var(--blue-bright); font-weight: 600; }
+  #edge-tooltip .et-meaning { margin-top: 4px; color: var(--ink-2); line-height: 1.5; }
 </style>
 </head>
 <body>
 
 <div id="cy"></div>
+<div id="edge-tooltip" class="hidden"></div>
 <div id="loading">加载图中…</div>
 
 <div id="topbar">
@@ -466,7 +485,16 @@ function buildCy(data) {
     });
   });
   data.edges.forEach((e, i) => {
-    elements.push({ data: { id: 'e' + i, source: e.source, target: e.target, type: e.type } });
+    elements.push({ data: {
+      id: 'e' + i,
+      source: e.source,
+      target: e.target,
+      type: e.type,
+      affix: e.affix || '',
+      meaning_cn: e.meaning_cn || '',
+      meaning_en: e.meaning_en || '',
+      display_label: e.display_label || '',
+    } });
   });
 
   state.cy = cytoscape({
@@ -540,13 +568,36 @@ function buildCy(data) {
       },
       // 邻接高亮
       { selector: '.dimmed', style: { 'opacity': 0.10 } },
-      { selector: 'edge.highlighted', style: { 'opacity': 1, 'line-color': '#cde2fb', 'target-arrow-color': '#cde2fb', 'width': 2.5 } },
+      {
+        selector: 'edge.highlighted',
+        style: {
+          'opacity': 1,
+          'line-color': '#cde2fb',
+          'target-arrow-color': '#cde2fb',
+          'width': 2.5,
+          // 边上显示标签（词缀含义）
+          'label': (ele) => ele.data('display_label'),
+          'font-size': 10,
+          'color': '#cde2fb',
+          'text-rotation': 'autorotate',  // 标签跟随边旋转
+          'text-margin-y': -10,           // 标签偏移，避免压线
+          'text-background-color': 'rgba(26, 26, 25, 0.8)',
+          'text-background-padding': '3px',
+          'text-background-shape': 'round-rectangle',
+        },
+      },
       { selector: 'node.highlighted', style: { 'opacity': 1 } },
+      // hover 边：加粗显示
+      { selector: 'edge.hovered', style: { 'opacity': 1, 'width': 2, 'line-color': '#86b6ef' } },
     ],
     layout: layoutOptions(),   // 跟随当前排布方式（力导向 / 记忆度 / 权重）
   });
 
   state.cy.on('tap', 'node', onNodeTap);
+  state.cy.on('mouseover', 'edge', onEdgeMouseOver);
+  state.cy.on('mouseout', 'edge', onEdgeMouseOut);
+  // 图平移/缩放时隐藏 tooltip（避免位置偏移）
+  state.cy.on('pan zoom', () => { $('edge-tooltip').classList.add('hidden'); });
 
   $('loading').style.display = 'none';
 }
@@ -556,6 +607,65 @@ function onNodeTap(evt) {
   const label = node.data('label');
   if (label === 'Word') openQuiz(node);
   else if (label === 'Sentence') openSentencePanel(node);
+}
+
+// 边 hover：显示 tooltip（词缀含义）
+function onEdgeMouseOver(evt) {
+  const edge = evt.target;
+  const displayLabel = edge.data('display_label');
+  if (!displayLabel) return;  // 无边属性的边不显示 tooltip
+
+  const tooltip = $('edge-tooltip');
+  const meaningCn = edge.data('meaning_cn') || '';
+  const meaningEn = edge.data('meaning_en') || '';
+  const edgeType = edge.data('type');
+
+  // 构造 tooltip 内容
+  let titleText = displayLabel;
+  let typeDesc = '';
+  if (edgeType === 'SHARES_PREFIX') {
+    typeDesc = '共享前缀';
+  } else if (edgeType === 'SHARES_SUFFIX') {
+    typeDesc = '共享后缀';
+  } else if (edgeType === 'CONTAINS') {
+    typeDesc = '包含单词';
+  } else if (edgeType === 'BELONGS_TO') {
+    typeDesc = '属于';
+  }
+
+  let html = '<div class="et-title">' + escapeHtml(titleText) + '</div>';
+  if (typeDesc) {
+    html += '<div class="et-meaning">' + escapeHtml(typeDesc) + '</div>';
+  }
+  if (meaningCn) {
+    html += '<div class="et-meaning">含义：' + escapeHtml(meaningCn) + '</div>';
+  }
+  if (meaningEn) {
+    html += '<div class="et-meaning" style="color:var(--ink-3);font-size:11px">(' + escapeHtml(meaningEn) + ')</div>';
+  }
+
+  tooltip.innerHTML = html;
+  tooltip.classList.remove('hidden');
+
+  // 定位 tooltip（跟随鼠标位置）
+  const pos = evt.renderedPosition;
+  tooltip.style.left = (pos.x + 15) + 'px';
+  tooltip.style.top = (pos.y - 15) + 'px';
+
+  // 确保 tooltip 不超出视口
+  requestAnimationFrame(() => {
+    const rect = tooltip.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 8) {
+      tooltip.style.left = (pos.x - rect.width - 15) + 'px';
+    }
+    if (rect.bottom > window.innerHeight - 8) {
+      tooltip.style.top = (pos.y - rect.height - 15) + 'px';
+    }
+  });
+}
+
+function onEdgeMouseOut() {
+  $('edge-tooltip').classList.add('hidden');
 }
 
 function highlight(node) {

@@ -34,8 +34,8 @@ class AutoMake:
     ) -> None:
         self.gdb = gdb
         self.llm = llm
-        self.prefixes = affixes.prefixes if affixes else []
-        self.suffixes = affixes.suffixes if affixes else []
+        self.prefixes = affixes.prefix_texts if affixes else []
+        self.suffixes = affixes.suffix_texts if affixes else []
 
     def ensure_category(self, name: str, description: str = "") -> None:
         self.gdb.run(graph.MERGE_CATEGORY, name=name, description=description)
