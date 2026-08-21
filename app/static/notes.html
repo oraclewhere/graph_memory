@@ -94,10 +94,30 @@
   .note-desc { font-size: 12px; color: var(--ink-3); }
   .note-meta { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
   .empty { font-size: 13px; color: var(--ink-3); }
+
+  /* 顶部栏：用户信息 + 退出 */
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 20px;
+  }
+  .user-info {
+    font-size: 13px; color: var(--ink-2);
+  }
+  .user-info b { color: var(--blue-bright); }
+  .logout-btn {
+    font-size: 12px; color: var(--ink-3); text-decoration: none;
+    padding: 6px 12px; border: 1px solid var(--panel-border); border-radius: 6px;
+  }
+  .logout-btn:hover { color: var(--ink); border-color: var(--blue-dim); }
 </style>
 </head>
 <body>
 <div class="wrap">
+
+  <div class="topbar">
+    <div class="user-info">当前用户：<b id="current-user">—</b></div>
+    <a class="logout-btn" href="#" id="logout-btn">退出登录</a>
+  </div>
 
   <header>
     <h1>graph_memory</h1>
@@ -138,6 +158,43 @@
 const $ = (id) => document.getElementById(id);
 let candidates = [];  // 当前候选词 [{word, pos, definition_cn, definition_en}]
 
+// 登录检查
+const token = localStorage.getItem('token');
+const user = JSON.parse(localStorage.getItem('user') || 'null');
+if (!token) {
+  location.href = '/login';
+} else {
+  $('current-user').textContent = user?.username || '未知';
+}
+
+// 退出登录
+$('logout-btn').onclick = (e) => {
+  e.preventDefault();
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  location.href = '/login';
+};
+
+// API 请求封装（自动带 Authorization）
+async function apiFetch(url, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  if (token) {
+    headers['Authorization'] = 'Bearer ' + token;
+  }
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401) {
+    // token 过期，跳转登录
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    location.href = '/login';
+    return null;
+  }
+  return res;
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -154,8 +211,8 @@ async function loadCategories() {
   const notes = $('notes');
   let cats = [];
   try {
-    const res = await fetch('/api/categories').then((r) => r.json());
-    cats = res.categories || [];
+    const res = await apiFetch('/api/categories').then((r) => r && r.json());
+    cats = (res && res.categories) || [];
   } catch (e) {
     cats = [];
   }
@@ -184,11 +241,10 @@ async function generateCandidates() {
   setStatus('正在让 LLM 生成候选单词…（约需十几秒）', 'loading');
   $('btn-candidates').disabled = true;
   try {
-    const res = await fetch('/api/candidate-words', {
+    const res = await apiFetch('/api/candidate-words', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ category: category, n: 10 }),
-    }).then((r) => r.json());
+    }).then((r) => r && r.json());
     candidates = res.words || [];
     renderCandidates();
     setStatus('已生成 ' + candidates.length + ' 个候选单词，勾选后点「生成图」', 'ok');
@@ -239,16 +295,15 @@ async function generateGraph() {
   setStatus('正在生成例句并构图…（可能需几十秒）', 'loading');
   $('btn-generate').disabled = true;
   try {
-    const res = await fetch('/api/automake', {
+    const res = await apiFetch('/api/automake', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         category: category,
         seeds: checked,
         n_sentences: nSentences,
         description: description,
       }),
-    }).then((r) => r.json());
+    }).then((r) => r && r.json());
     if (res.ok) {
       setStatus('已生成：' + res.sentences.length + ' 条例句，新增 ' + res.new_words.length + ' 个单词', 'ok');
       candidates = [];

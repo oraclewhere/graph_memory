@@ -55,6 +55,7 @@ def review_word(
     gdb: db_module.GraphDB,
     text: str,
     memory_strength: float = 1.0,
+    user_id: int | None = None,
 ) -> dict | None:
     """复习成功：把记忆度重置为给定值（默认 1.0），并把 last_reviewed_at 刷新为现在。
 
@@ -66,5 +67,6 @@ def review_word(
         text=text,
         memory_strength=memory_strength,
         last_reviewed_at=now,
+        user_id=user_id,
     )
     return rows[0] if rows else None

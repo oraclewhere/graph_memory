@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 - graph_memory</title>
+<style>
+  :root {
+    --surface: #1a1a19;
+    --panel: #232322;
+    --panel-border: #3a3a38;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-3: #898781;
+    --blue-bright: #cde2fb;
+    --blue-dim: #3987e5;
+    --critical: #e66767;
+    --good: #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-card {
+    width: 360px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .login-title {
+    font-size: 24px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .login-subtitle {
+    font-size: 13px;
+    color: var(--ink-3);
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  .form-group {
+    margin-bottom: 18px;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 13px;
+    color: var(--ink-2);
+    margin-bottom: 6px;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 15px;
+    background: #141414;
+    color: var(--ink);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .form-input:focus {
+    border-color: var(--blue-bright);
+  }
+
+  .form-input::placeholder {
+    color: var(--ink-3);
+  }
+
+  .btn {
+    width: 100%;
+    padding: 13px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--blue-dim);
+    color: #fff;
+  }
+
+  .btn-primary:hover {
+    background: #2f7ad4;
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .tabs {
+    display: flex;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .tab {
+    flex: 1;
+    padding: 12px;
+    font-size: 14px;
+    text-align: center;
+    color: var(--ink-3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .tab.active {
+    color: var(--blue-bright);
+    border-bottom-color: var(--blue-bright);
+  }
+
+  .tab:hover {
+    color: var(--ink);
+  }
+
+  .error-msg {
+    font-size: 13px;
+    color: var(--critical);
+    text-align: center;
+    margin-top: 12px;
+    min-height: 18px;
+  }
+
+  .success-msg {
+    font-size: 13px;
+    color: var(--good);
+    text-align: center;
+    margin-top: 12px;
+  }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="login-title">graph_memory</div>
+  <div class="login-subtitle">英文单词记忆图服务</div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="login">登录</div>
+    <div class="tab" data-tab="register">注册</div>
+  </div>
+
+  <form id="login-form">
+    <div class="form-group">
+      <label class="form-label" for="login-username">用户名</label>
+      <input class="form-input" type="text" id="login-username" placeholder="请输入用户名" autocomplete="username" required>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="login-password">密码</label>
+      <input class="form-input" type="password" id="login-password" placeholder="请输入密码" autocomplete="current-password" required>
+    </div>
+    <button class="btn btn-primary" type="submit">登录</button>
+    <div class="error-msg" id="login-error"></div>
+  </form>
+
+  <form id="register-form" class="hidden">
+    <div class="form-group">
+      <label class="form-label" for="reg-username">用户名</label>
+      <input class="form-input" type="text" id="reg-username" placeholder="3-50 个字符" autocomplete="username" required minlength="3" maxlength="50">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="reg-password">密码</label>
+      <input class="form-input" type="password" id="reg-password" placeholder="至少 6 个字符" autocomplete="new-password" required minlength="6">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="reg-confirm">确认密码</label>
+      <input class="form-input" type="password" id="reg-confirm" placeholder="再次输入密码" autocomplete="new-password" required>
+    </div>
+    <button class="btn btn-primary" type="submit">注册</button>
+    <div class="error-msg" id="register-error"></div>
+  </form>
+</div>
+
+<script>
+// 如果已登录，直接跳转首页
+if (localStorage.getItem('token')) {
+  location.href = '/';
+}
+
+// Tab 切换
+const tabs = document.querySelectorAll('.tab');
+const loginForm = document.getElementById('login-form');
+const registerForm = document.getElementById('register-form');
+
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+
+    if (tab.dataset.tab === 'login') {
+      loginForm.classList.remove('hidden');
+      registerForm.classList.add('hidden');
+    } else {
+      loginForm.classList.add('hidden');
+      registerForm.classList.remove('hidden');
+    }
+  });
+});
+
+// 登录
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('login-error');
+  errorEl.textContent = '';
+
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+
+  if (!username || !password) {
+    errorEl.textContent = '请输入用户名和密码';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.detail || '登录失败';
+      return;
+    }
+
+    // 保存 token 和用户信息
+    localStorage.setItem('token', data.access_token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+
+    // 跳转首页
+    location.href = '/';
+  } catch (err) {
+    errorEl.textContent = '网络错误，请重试';
+  }
+});
+
+// 注册
+registerForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('register-error');
+  errorEl.textContent = '';
+
+  const username = document.getElementById('reg-username').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const confirm = document.getElementById('reg-confirm').value;
+
+  if (!username || !password || !confirm) {
+    errorEl.textContent = '请填写所有字段';
+    return;
+  }
+
+  if (password !== confirm) {
+    errorEl.textContent = '两次输入的密码不一致';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.detail || '注册失败';
+      return;
+    }
+
+    // 保存 token 和用户信息
+    localStorage.setItem('token', data.access_token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+
+    // 跳转首页
+    location.href = '/';
+  } catch (err) {
+    errorEl.textContent = '网络错误，请重试';
+  }
+});
+</script>
+</body>
+</html>

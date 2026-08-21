@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /home/graph_memory status)",
+      "Bash(curl -fsSL --max-time 60 -o cytoscape.min.js \"https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js\")",
+      "Bash(/usr/bin/python3.10 -m pytest -q)",
+      "Bash(echo *)",
+      "Bash(docker-compose up *)",
+      "Bash(pkill -f \"uvicorn app.main\")",
+      "Bash(kill 9357)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --max-time 2 http://127.0.0.1:8000/)",
+      "Bash(/usr/bin/python3.10 -c ' *)",
+      "Bash(node --check /tmp/notes.js)",
+      "Bash(node --check /tmp/index.js)",
+      "Bash(pkill -f 'uvicorn app[.]main')",
+      "Bash(nohup /usr/bin/python3.10 -m uvicorn app.main:app --host 0.0.0.0 --port 8000)"
+    ]
+  }
+}

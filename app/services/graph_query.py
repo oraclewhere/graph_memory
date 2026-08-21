@@ -14,6 +14,7 @@ def get_graph(
     half_life_days: float = DEFAULT_HALF_LIFE_DAYS,
     category: str | None = None,
     affixes: AffixConfig | None = None,
+    user_id: int | None = None,
 ) -> dict:
     """导出图结构：{"nodes": [...], "edges": [...]}。
 
@@ -31,11 +32,11 @@ def get_graph(
     edges: list[dict] = []
 
     # 度中心性，与 weight.compute_weights 同一个查询，保证前端排布和推送排序口径一致
-    degrees = {r["text"]: r["degree"] for r in gdb.run(graph.ALL_WORD_DEGREES)}
+    degrees = {r["text"]: r["degree"] for r in gdb.run(graph.ALL_WORD_DEGREES, user_id=user_id)}
 
     # Word：先算记忆度，并记录 text -> memory 供例句均值使用
     words_query = graph.GET_CATEGORY_WORDS if category else graph.GET_ALL_WORDS_FULL
-    word_params = {"category": category} if category else {}
+    word_params = {"category": category, "user_id": user_id} if category else {"user_id": user_id}
     word_mem: dict[str, float] = {}
     for r in gdb.run(words_query, **word_params):
         w = dict(r["w"])
@@ -58,7 +59,7 @@ def get_graph(
 
     # Category
     cats_query = graph.GET_CATEGORY_BY_NAME if category else graph.GET_ALL_CATEGORIES
-    cat_params = {"name": category} if category else {}
+    cat_params = {"name": category, "user_id": user_id} if category else {"user_id": user_id}
     for r in gdb.run(cats_query, **cat_params):
         c = dict(r["c"])
         nodes.append({
@@ -72,7 +73,7 @@ def get_graph(
 
     # Sentence：先占位，记忆度稍后按所含词均值填入
     sents_query = graph.GET_CATEGORY_SENTENCES if category else graph.GET_ALL_SENTENCES
-    sent_params = {"category": category} if category else {}
+    sent_params = {"category": category, "user_id": user_id} if category else {"user_id": user_id}
     sentence_nodes: list[dict] = []
     for r in gdb.run(sents_query, **sent_params):
         s = dict(r["s"])
@@ -99,7 +100,7 @@ def get_graph(
     if affixes is None:
         affixes = load_affix_config()
 
-    for r in gdb.run(graph.GET_ALL_RELATIONSHIPS):
+    for r in gdb.run(graph.GET_ALL_RELATIONSHIPS, user_id=user_id):
         source = f"{str(r['a_label']).lower()}:{r['a_key']}"
         target = f"{str(r['b_label']).lower()}:{r['b_key']}"
         if node_ids is not None and (source not in node_ids or target not in node_ids):

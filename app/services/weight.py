@@ -22,6 +22,7 @@ DEFAULT_INTENSITY = 0.5
 def compute_weights(
     gdb: db_module.GraphDB,
     category: str | None = None,
+    user_id: int | None = None,
 ) -> list[dict]:
     """实时计算每个单词的度中心性（关联边数量）作为重要度权重。
 
@@ -29,9 +30,9 @@ def compute_weights(
     返回按权重降序排列的 [{"text": ..., "weight": ...}, ...]。
     """
     if category:
-        records = gdb.run(graph.CATEGORY_WORD_DEGREES, category=category)
+        records = gdb.run(graph.CATEGORY_WORD_DEGREES, category=category, user_id=user_id)
     else:
-        records = gdb.run(graph.ALL_WORD_DEGREES)
+        records = gdb.run(graph.ALL_WORD_DEGREES, user_id=user_id)
     return [{"text": r["text"], "weight": r["degree"]} for r in records]
 
 
@@ -41,6 +42,7 @@ def select_seeds(
     intensity: float = DEFAULT_INTENSITY,
     k: int = 5,
     exclude: set[str] | None = None,
+    user_id: int | None = None,
 ) -> list[dict]:
     """按「收敛强度」在权重谱上取样，选出下一轮 autoMake 的种子单词。
 
@@ -68,9 +70,9 @@ def select_seeds(
     skip = {w.strip().lower() for w in (exclude or set())}
 
     if category:
-        records = gdb.run(graph.CATEGORY_WORD_DEGREES, category=category)
+        records = gdb.run(graph.CATEGORY_WORD_DEGREES, category=category, user_id=user_id)
     else:
-        records = gdb.run(graph.ALL_WORD_DEGREES)
+        records = gdb.run(graph.ALL_WORD_DEGREES, user_id=user_id)
     if not records:
         return []
 
@@ -99,6 +101,7 @@ def rank_words(
     half_life_days: float = DEFAULT_HALF_LIFE_DAYS,
     limit: int | None = None,
     category: str | None = None,
+    user_id: int | None = None,
 ) -> list[dict]:
     """按「重要度 × 遗忘比例」降序排列，得出推送复习的顺序。
 
@@ -111,13 +114,13 @@ def rank_words(
 
     返回 [{"text", "weight", "weight_norm", "memory_strength", "score"}, ...]。
     """
-    weights = compute_weights(gdb, category=category)
+    weights = compute_weights(gdb, category=category, user_id=user_id)
     max_w = max((w["weight"] for w in weights), default=0) or 1
 
     now = datetime.now(timezone.utc)
     mem = {
         r["text"]: memory_strength_at(r.get("last_reviewed_at"), now, half_life_days)
-        for r in gdb.run(graph.GET_WORDS_REVIEW)
+        for r in gdb.run(graph.GET_WORDS_REVIEW, user_id=user_id)
     }
 
     # 如果指定了分类，只保留该分类内的单词

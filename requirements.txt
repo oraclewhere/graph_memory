@@ -7,3 +7,9 @@ pydantic-settings>=2.2
 pyyaml>=6.0
 pytest>=8.0
 httpx>=0.27
+# 用户认证相关
+pymysql>=1.1
+cryptography>=42.0
+passlib[bcrypt]>=1.7
+python-jose[cryptography]>=3.3
+sqlalchemy>=2.0

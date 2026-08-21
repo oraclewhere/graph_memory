@@ -332,6 +332,7 @@
   <a class="back" href="/">← 笔记列表</a>
   <h1 id="title">graph_memory</h1>
   <span class="hint">圆形单词填空 · 方形例句看内容 · 右上「＋」增词</span>
+  <a class="back" href="#" id="logout-btn" style="margin-left:auto">退出</a>
 </div>
 
 <div id="search-wrap">
@@ -455,13 +456,42 @@ function memColor(m) {
 const state = { cy: null, current: null, pending: null, pendingAnswer: '', unfollowPanel: null };
 const $ = (id) => document.getElementById(id);
 
+// 登录检查
+const token = localStorage.getItem('token');
+const user = JSON.parse(localStorage.getItem('user') || 'null');
+if (!token) {
+  location.href = '/login';
+}
+
+// API 请求封装（自动带 Authorization）
+async function apiFetch(url, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  if (token) {
+    headers['Authorization'] = 'Bearer ' + token;
+  }
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    location.href = '/login';
+    return null;
+  }
+  return res;
+}
+
 const CATEGORY = new URLSearchParams(location.search).get('category');
 if (CATEGORY) $('title').textContent = CATEGORY;
 
 async function loadGraph() {
   const url = CATEGORY ? '/api/graph?category=' + encodeURIComponent(CATEGORY) : '/api/graph';
-  const data = await fetch(url).then((r) => r.json());
-  buildCy(data);
+  const res = await apiFetch(url);
+  if (res) {
+    const data = await res.json();
+    buildCy(data);
+  }
 }
 
 function buildCy(data) {
@@ -846,11 +876,10 @@ async function markReviewed(node) {
   try {
     // 传入 category 参数，让 next 只在当前分类内排名
     const params = CATEGORY ? '?category=' + encodeURIComponent(CATEGORY) : '';
-    res = await fetch('/api/review' + params, {
+    res = await apiFetch('/api/review' + params, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ word: text }),
-    }).then((r) => r.json());
+    }).then((r) => r && r.json());
   } catch (e) {
     setFeedback('更新失败：后端未响应', 'err');
     return;
@@ -1099,7 +1128,8 @@ async function previewGrowSeeds() {
   });
   if (grow.focus) q.set('focus', grow.focus);
   try {
-    const res = await fetch('/api/seeds?' + q).then((r) => r.json());
+    const res = await apiFetch('/api/seeds?' + q).then((r) => r && r.json());
+    if (!res) return;
     const parts = (res.words || []).map((w) =>
       '<span class="sd">' + escapeHtml(w.text) + '</span><span class="dg">(' + w.weight + '度)</span>');
     if (grow.focus) {
@@ -1121,9 +1151,8 @@ async function confirmGrow() {
   setGrowStatus('正在生成例句并入图…（可能需几十秒）', 'loading');
   $('grow-confirm').disabled = true;
   try {
-    const res = await fetch('/api/automake', {
+    const res = await apiFetch('/api/automake', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         category: CATEGORY,
         seeds: [],                          // 空 = 交给后端按强度选
@@ -1132,7 +1161,7 @@ async function confirmGrow() {
         n_seeds: GROW_SEEDS,
         n_sentences: parseInt($('grow-n-sentences').value, 10) || 5,
       }),
-    }).then((r) => r.json());
+    }).then((r) => r && r.json());
     if (res.ok) {
       setGrowStatus('生成完毕，正在刷新图…', 'ok');
       await reloadGraph();          // 先刷图，结果面板里的单词才点得到
@@ -1206,6 +1235,14 @@ $('btn-show-answer').onclick = () => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') handleEscape();
 });
+
+// 退出登录
+$('logout-btn').onclick = (e) => {
+  e.preventDefault();
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  location.href = '/login';
+};
 
 loadGraph().catch((e) => {
   $('loading').textContent = '加载失败：请确认后端服务已启动（uvicorn app.main:app）';

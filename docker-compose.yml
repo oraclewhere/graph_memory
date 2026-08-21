@@ -10,5 +10,19 @@ services:
     volumes:
       - neo4j_data:/data
 
+  mysql:
+    image: mysql:8
+    container_name: graph_memory_mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - MYSQL_DATABASE=graph_memory
+      - MYSQL_USER=app
+      - MYSQL_PASSWORD=apppass
+    volumes:
+      - mysql_data:/var/lib/mysql
+
 volumes:
   neo4j_data:
+  mysql_data:

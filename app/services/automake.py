@@ -31,17 +31,19 @@ class AutoMake:
         gdb: db_module.GraphDB,
         llm: LLMClient,
         affixes: AffixConfig | None = None,
+        user_id: int | None = None,
     ) -> None:
         self.gdb = gdb
         self.llm = llm
         self.prefixes = affixes.prefix_texts if affixes else []
         self.suffixes = affixes.suffix_texts if affixes else []
+        self.user_id = user_id
 
     def ensure_category(self, name: str, description: str = "") -> None:
-        self.gdb.run(graph.MERGE_CATEGORY, name=name, description=description)
+        self.gdb.run(graph.MERGE_CATEGORY, name=name, description=description, user_id=self.user_id)
 
     def existing_words(self) -> set[str]:
-        return {r["text"] for r in self.gdb.run(graph.GET_ALL_WORDS)}
+        return {r["text"] for r in self.gdb.run(graph.GET_ALL_WORDS, user_id=self.user_id)}
 
     @staticmethod
     def _to_word_info(seed: WordInfo | str) -> WordInfo:
@@ -65,8 +67,9 @@ class AutoMake:
                 pos=wi.pos,
                 definition_cn=wi.definition_cn,
                 definition_en=wi.definition_en,
+                user_id=self.user_id,
             )
-            self.gdb.run(graph.LINK_WORD_CATEGORY, text=wi.word, category=category)
+            self.gdb.run(graph.LINK_WORD_CATEGORY, text=wi.word, category=category, user_id=self.user_id)
 
     def pick_seeds(
         self,
@@ -95,10 +98,11 @@ class AutoMake:
                 intensity=intensity,
                 k=max(0, k - 1),
                 exclude={focus_word},
+                user_id=self.user_id,
             )
             return [focus_word] + [c["text"] for c in companions]
 
-        picked = select_seeds(self.gdb, category=category, intensity=intensity, k=k)
+        picked = select_seeds(self.gdb, category=category, intensity=intensity, k=k, user_id=self.user_id)
         if picked:
             return [p["text"] for p in picked]
         return self.llm.generate_top_words(category, k)
@@ -127,8 +131,9 @@ class AutoMake:
                 text=si.sentence,
                 translation=si.translation,
                 created_at=created_at,
+                user_id=self.user_id,
             )
-            self.gdb.run(graph.LINK_SENTENCE_CATEGORY, text=si.sentence, category=category)
+            self.gdb.run(graph.LINK_SENTENCE_CATEGORY, text=si.sentence, category=category, user_id=self.user_id)
             for wi in si.words:
                 word = wi.word.strip().lower()
                 if not word:
@@ -141,11 +146,12 @@ class AutoMake:
                         pos=wi.pos,
                         definition_cn=wi.definition_cn,
                         definition_en=wi.definition_en,
+                        user_id=self.user_id,
                     )
-                    self.gdb.run(graph.LINK_WORD_CATEGORY, text=word, category=category)
+                    self.gdb.run(graph.LINK_WORD_CATEGORY, text=word, category=category, user_id=self.user_id)
                     known.add(word)
                     new_words.append(word)
-                self.gdb.run(graph.LINK_SENTENCE_WORD, text=si.sentence, word=word)
+                self.gdb.run(graph.LINK_SENTENCE_WORD, text=si.sentence, word=word, user_id=self.user_id)
                 if is_new:
                     self._link_affixes(word)
 
@@ -163,16 +169,16 @@ class AutoMake:
                 continue
             for other in self._words_with_prefix(prefix):
                 if other != word:
-                    self.gdb.run(graph.LINK_SHARES_PREFIX, a=word, b=other, affix=prefix)
+                    self.gdb.run(graph.LINK_SHARES_PREFIX, a=word, b=other, affix=prefix, user_id=self.user_id)
         for suffix in self.suffixes:
             if not word.endswith(suffix):
                 continue
             for other in self._words_with_suffix(suffix):
                 if other != word:
-                    self.gdb.run(graph.LINK_SHARES_SUFFIX, a=word, b=other, affix=suffix)
+                    self.gdb.run(graph.LINK_SHARES_SUFFIX, a=word, b=other, affix=suffix, user_id=self.user_id)
 
     def _words_with_prefix(self, prefix: str) -> list[str]:
-        return [r["text"] for r in self.gdb.run(graph.WORDS_WITH_PREFIX, prefix=prefix)]
+        return [r["text"] for r in self.gdb.run(graph.WORDS_WITH_PREFIX, prefix=prefix, user_id=self.user_id)]
 
     def _words_with_suffix(self, suffix: str) -> list[str]:
-        return [r["text"] for r in self.gdb.run(graph.WORDS_WITH_SUFFIX, suffix=suffix)]
+        return [r["text"] for r in self.gdb.run(graph.WORDS_WITH_SUFFIX, suffix=suffix, user_id=self.user_id)]

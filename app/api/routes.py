@@ -1,15 +1,17 @@
 """FastAPI 路由。"""
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app import db as db_module
 from app.config import load_affix_config
 from app.models import graph
 from app.models.schemas import WordInfo
+from app.models.user import User
 from app.services import graph_query, memory
 from app.services.automake import AutoMake
+from app.services.auth import get_current_user
 from app.services.llm import LLMClient
 from app.services.weight import DEFAULT_INTENSITY, rank_words, select_seeds
 
@@ -43,22 +45,25 @@ def health() -> dict:
 
 
 @router.get("/graph")
-def graph_structure(category: str | None = None) -> dict:
+def graph_structure(
+    category: str | None = None,
+    user: User = Depends(get_current_user),
+) -> dict:
     """返回图结构（节点 + 边）；指定 category 时只返回该分类的子图。"""
     gdb = db_module.GraphDB()
     try:
         affixes = load_affix_config()
-        return graph_query.get_graph(gdb, category=category, affixes=affixes)
+        return graph_query.get_graph(gdb, category=category, affixes=affixes, user_id=user.id)
     finally:
         gdb.close()
 
 
 @router.get("/categories")
-def categories() -> dict:
+def categories(user: User = Depends(get_current_user)) -> dict:
     """返回所有分类及统计（笔记列表用）。"""
     gdb = db_module.GraphDB()
     try:
-        rows = gdb.run(graph.GET_CATEGORY_STATS)
+        rows = gdb.run(graph.GET_CATEGORY_STATS, user_id=user.id)
         return {
             "categories": [
                 {
@@ -75,7 +80,10 @@ def categories() -> dict:
 
 
 @router.post("/candidate-words")
-def candidate_words(req: CandidateRequest) -> dict:
+def candidate_words(
+    req: CandidateRequest,
+    user: User = Depends(get_current_user),
+) -> dict:
     """让 LLM 生成该分类的候选种子单词（只调 LLM、不写库，供半自动勾选）。"""
     llm = LLMClient()
     words = llm.generate_top_words(req.category, req.n)
@@ -88,6 +96,7 @@ def seeds(
     intensity: float = DEFAULT_INTENSITY,
     k: int = 5,
     focus: str = "",
+    user: User = Depends(get_current_user),
 ) -> dict:
     """预览按收敛强度选出的种子单词（只读图、不调 LLM、不写库）。
 
@@ -105,10 +114,11 @@ def seeds(
                 intensity=intensity,
                 k=max(0, k - 1),
                 exclude={focus_word},
+                user_id=user.id,
             )
             return {"words": picked, "intensity": intensity,
                     "focus": focus_word, "cold_start": False}
-        picked = select_seeds(gdb, category=category, intensity=intensity, k=k)
+        picked = select_seeds(gdb, category=category, intensity=intensity, k=k, user_id=user.id)
         return {"words": picked, "intensity": intensity,
                 "focus": "", "cold_start": not picked}
     finally:
@@ -116,7 +126,10 @@ def seeds(
 
 
 @router.post("/automake")
-def automake(req: AutoMakeRequest) -> dict:
+def automake(
+    req: AutoMakeRequest,
+    user: User = Depends(get_current_user),
+) -> dict:
     """执行一轮 autoMake 并写库。
 
     `seeds` 非空 = 用勾选的种子（半自动，首页新建笔记用）；
@@ -129,7 +142,7 @@ def automake(req: AutoMakeRequest) -> dict:
         gdb.init_constraints()
         affixes = load_affix_config()
         llm = LLMClient()
-        am = AutoMake(gdb, llm, affixes)
+        am = AutoMake(gdb, llm, affixes, user_id=user.id)
         auto = not req.seeds
         seed_list = (
             am.pick_seeds(
@@ -159,24 +172,32 @@ def automake(req: AutoMakeRequest) -> dict:
 
 
 @router.get("/rank")
-def rank(limit: int | None = None, category: str | None = None) -> dict:
+def rank(
+    limit: int | None = None,
+    category: str | None = None,
+    user: User = Depends(get_current_user),
+) -> dict:
     """按「权重归一化 × (1 - 记忆度)」降序返回推送复习顺序。
     指定 category 时只返回该分类内的单词。"""
     gdb = db_module.GraphDB()
     try:
-        return {"words": rank_words(gdb, limit=limit, category=category)}
+        return {"words": rank_words(gdb, limit=limit, category=category, user_id=user.id)}
     finally:
         gdb.close()
 
 
 @router.post("/review")
-def review(req: ReviewRequest, category: str | None = None) -> dict:
+def review(
+    req: ReviewRequest,
+    category: str | None = None,
+    user: User = Depends(get_current_user),
+) -> dict:
     """复习成功：重置该词记忆度，返回更新后的词 + 下一个待复习词（rank 第一位）。
     指定 category 时，next 只在该分类内排名。"""
     gdb = db_module.GraphDB()
     try:
-        updated = memory.review_word(gdb, req.word)
-        next_words = rank_words(gdb, limit=1, category=category)
+        updated = memory.review_word(gdb, req.word, user_id=user.id)
+        next_words = rank_words(gdb, limit=1, category=category, user_id=user.id)
         return {
             "ok": updated is not None,
             "word": req.word,
