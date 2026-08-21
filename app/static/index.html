@@ -201,66 +201,79 @@
            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sr-empty { padding: 8px 12px; font-size: 12px; color: var(--ink-3); }
 
-  /* 模式切换 Tab */
+  /* 顶部模式切换 Tab - 作为页面顶级导航 */
   #mode-tabs {
-    position: absolute; top: 52px; left: 50%; transform: translateX(-50%);
-    z-index: 14; display: flex; gap: 0;
-    background: var(--panel); border: 1px solid var(--panel-border);
-    border-radius: 8px; overflow: hidden;
+    position: absolute; top: 0; left: 0; right: 0;
+    z-index: 20; display: flex; justify-content: center;
+    background: var(--panel); border-bottom: 1px solid var(--panel-border);
+    padding: 8px 0;
   }
   .mode-tab {
-    padding: 5px 14px; font-size: 12px; font-weight: 500;
+    padding: 8px 24px; font-size: 14px; font-weight: 500;
     background: transparent; color: var(--ink-3); border: none;
     cursor: pointer; transition: all 0.15s ease;
+    border-radius: 6px; margin: 0 4px;
   }
   .mode-tab:hover { color: var(--ink-2); background: rgba(255,255,255,0.04); }
   .mode-tab.active {
     background: var(--blue-dim); color: #fff; font-weight: 600;
   }
 
-  /* 复习模式：单词输入区 */
+  /* 复习模式：单词输入区 - 直接在隐藏字母位置输入 */
   #review-wrap {
-    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-    z-index: 14; width: 320px;
+    position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+    z-index: 14; width: 380px;
     background: var(--panel); border: 1px solid var(--panel-border);
-    border-radius: 10px; padding: 12px 16px;
+    border-radius: 10px; padding: 16px 20px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   }
   #review-wrap.hidden { display: none; }
   #review-progress {
     display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 6px; font-size: 11px; color: var(--ink-3);
+    margin-bottom: 12px; font-size: 12px; color: var(--ink-3);
   }
-  #review-count { color: var(--blue-bright); font-weight: 600; font-size: 12px; }
-  #review-hint {
-    font-size: 22px; font-weight: 700; color: var(--ink);
-    letter-spacing: 3px; margin-bottom: 4px; word-break: break-all;
+  #review-count { color: var(--blue-bright); font-weight: 600; font-size: 13px; }
+  #review-mode-label { font-weight: 500; }
+  /* 直接在 _ 位置输入的容器 */
+  #review-word-input {
+    display: flex; align-items: center; justify-content: center;
+    gap: 4px; margin-bottom: 12px; padding: 12px 0;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .letter-slot {
+    width: 24px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700; color: var(--ink);
     font-family: 'Courier New', monospace;
   }
-  #review-def-cn { font-size: 14px; color: var(--ink-2); margin-bottom: 2px; }
-  #review-def-en { font-size: 11px; color: var(--ink-3); margin-bottom: 8px; }
-  #review-input-wrap { display: flex; gap: 6px; }
-  #review-input {
-    flex: 1; padding: 8px 12px; font-size: 15px;
-    background: #141414; color: var(--ink);
-    border: 1px solid var(--panel-border); border-radius: 8px; outline: none;
+  .letter-slot input {
+    width: 100%; height: 100%;
+    background: transparent; border: none;
+    border-bottom: 2px solid var(--blue-bright);
+    color: var(--ink); font-size: 20px; font-weight: 700;
+    text-align: center; outline: none;
+    font-family: 'Courier New', monospace;
   }
-  #review-input:focus { border-color: var(--blue-bright); }
-  #review-submit {
-    padding: 8px 14px; font-size: 14px; font-weight: 600;
-    background: var(--blue-dim); color: #fff; border: none;
-    border-radius: 8px; cursor: pointer; white-space: nowrap;
+  .letter-slot input:focus {
+    border-bottom-color: var(--blue-bright);
+    background: rgba(57, 135, 229, 0.1);
   }
-  #review-submit:hover { background: #2f7ad4; }
+  .letter-slot input.correct {
+    color: var(--good); border-bottom-color: var(--good);
+  }
+  .letter-slot input.wrong {
+    color: var(--critical); border-bottom-color: var(--critical);
+  }
+  .letter-slot.shown {
+    color: var(--ink); border-bottom: 2px solid transparent;
+  }
+  #review-def-cn { font-size: 15px; color: var(--ink-2); margin-bottom: 4px; }
+  #review-def-en { font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
   #review-feedback {
-    margin-top: 6px; font-size: 13px; min-height: 18px;
+    font-size: 14px; min-height: 20px; text-align: center;
   }
   #review-feedback.ok { color: var(--good); }
   #review-feedback.err { color: var(--critical); }
-  #review-sentence-progress {
-    margin-top: 6px; font-size: 11px; color: var(--ink-3);
-    border-top: 1px solid var(--panel-border); padding-top: 4px;
-  }
 
   /* 复习模式：例句复习面板 */
   #sentence-review-panel {
@@ -430,6 +443,12 @@
 </head>
 <body>
 
+<!-- 顶部模式切换 Tab - 作为页面顶级导航 -->
+<div id="mode-tabs">
+  <button class="mode-tab active" data-mode="explore">探索模式</button>
+  <button class="mode-tab" data-mode="review">复习模式</button>
+</div>
+
 <div id="cy"></div>
 <div id="edge-tooltip" class="hidden"></div>
 <div id="loading">加载图中…</div>
@@ -446,32 +465,21 @@
   <div id="search-results" class="hidden"></div>
 </div>
 
-<div id="mode-tabs">
-  <button class="mode-tab active" data-mode="explore">探索模式</button>
-  <button class="mode-tab" data-mode="review">复习模式</button>
-</div>
-
+<!-- 复习模式：直接在隐藏字母位置输入 -->
 <div id="review-wrap" class="hidden">
   <div id="review-progress">
     <span id="review-count">0/0</span>
     <span id="review-mode-label">单词复习</span>
   </div>
-  <div id="review-challenge">
-    <div id="review-hint"></div>
-    <div id="review-def-cn"></div>
-    <div id="review-def-en"></div>
-  </div>
-  <div id="review-input-wrap">
-    <input id="review-input" type="text" placeholder="输入完整单词，回车提交"
-           autocomplete="off" spellcheck="false">
-    <button id="review-submit">提交</button>
-  </div>
+  <div id="review-word-input"></div>
+  <div id="review-def-cn"></div>
+  <div id="review-def-en"></div>
   <div id="review-feedback"></div>
-  <div id="review-sentence-progress"></div>
 </div>
 
 <button id="grow-btn" title="增加新的单词">＋</button>
 
+<!-- 布局选项在两种模式下都显示，复习模式用它决定选词策略 -->
 <div id="layout-bar">
   <span class="lb-title">排布方式</span>
   <label><input type="radio" name="layout" value="force" checked> 力导向</label>
@@ -1462,52 +1470,72 @@ function initializeReviewMode() {
 function generateHiddenWord(word) {
   const len = word.length;
   if (len <= 1) {
-    return { display: word, hiddenIndices: [] };
+    return { letters: word.split(''), hiddenIndices: [] };
   }
   if (len === 2) {
-    return { display: word[0] + ' _', hiddenIndices: [1] };
+    return { letters: word.split(''), hiddenIndices: [1] };
   }
   if (len === 3) {
-    return { display: word[0] + ' _ _', hiddenIndices: [1, 2] };
+    return { letters: word.split(''), hiddenIndices: [1, 2] };
   }
   // 4+ 字母：隐藏 80%+
   const totalHide = Math.max(1, Math.ceil(len * 0.8));
   const candidates = Array.from({ length: len - 1 }, (_, i) => i + 1);
   shuffleArray(candidates);
   const hiddenSet = new Set(candidates.slice(0, totalHide));
-
-  let display = '';
-  const hiddenIndices = [];
-  for (let i = 0; i < len; i++) {
-    if (i > 0) display += ' ';
-    if (hiddenSet.has(i)) {
-      display += '_';
-      hiddenIndices.push(i);
-    } else {
-      display += word[i];
-    }
-  }
-  return { display, hiddenIndices };
+  return { letters: word.split(''), hiddenIndices: [...hiddenSet] };
 }
 
-// 开始单词复习
+// 开始单词复习 - 直接在 _ 位置生成输入框
 function startWordReview(entry) {
   const node = entry.node;
   const word = entry.text;
-  const { display } = generateHiddenWord(word);
+  const { letters, hiddenIndices } = generateHiddenWord(word);
 
   state.currentReviewWord = {
-    node, word,
+    node, word, letters, hiddenIndices,
     defCn: node.data('definition_cn') || '',
     defEn: node.data('definition_en') || '',
   };
 
-  $('review-hint').textContent = display;
+  // 构建字母槽 UI
+  const container = $('review-word-input');
+  container.innerHTML = '';
+  letters.forEach((letter, i) => {
+    const slot = document.createElement('div');
+    slot.className = 'letter-slot';
+    if (hiddenIndices.includes(i)) {
+      // 隐藏字母 - 生成输入框
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 1;
+      input.dataset.index = i;
+      input.dataset.answer = letter;
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      // 输入后自动跳到下一个空位
+      input.addEventListener('input', (e) => handleLetterInput(e, i));
+      // Backspace 时跳回上一个空位
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !e.target.value) {
+          moveToPrevInput(i);
+        } else if (e.key === 'Enter') {
+          submitReviewAnswer();
+        }
+      });
+      slot.appendChild(input);
+    } else {
+      // 显示字母
+      slot.className += ' shown';
+      slot.textContent = letter;
+    }
+    container.appendChild(slot);
+  });
+
   $('review-def-cn').textContent = state.currentReviewWord.defCn
     ? '释义：' + state.currentReviewWord.defCn
     : '（暂无中文释义）';
   $('review-def-en').textContent = state.currentReviewWord.defEn || '';
-  $('review-input').value = '';
   setReviewFeedback('', '');
   updateReviewProgress();
 
@@ -1518,7 +1546,44 @@ function startWordReview(entry) {
     state.cy.animate({ center: { eles: node }, zoom: 1.1 }, { duration: 250 });
   }
 
-  $('review-input').focus();
+  // 聚焦到第一个输入框
+  const firstInput = container.querySelector('input');
+  if (firstInput) setTimeout(() => firstInput.focus(), 100);
+}
+
+// 处理字母输入
+function handleLetterInput(e, currentIdx) {
+  const input = e.target;
+  const value = input.value.toLowerCase();
+  if (value) {
+    input.value = value;
+    moveToNextInput(currentIdx);
+  }
+}
+
+// 移到下一个输入框
+function moveToNextInput(currentIdx) {
+  const inputs = $('review-word-input').querySelectorAll('input');
+  const inputsArr = Array.from(inputs);
+  const currentInputIdx = inputsArr.findIndex(inp => parseInt(inp.dataset.index) === currentIdx);
+  if (currentInputIdx < inputsArr.length - 1) {
+    inputsArr[currentInputIdx + 1].focus();
+  } else {
+    // 最后一个输入框，自动提交
+    setTimeout(() => submitReviewAnswer(), 100);
+  }
+}
+
+// 移到上一个输入框
+function moveToPrevInput(currentIdx) {
+  const inputs = $('review-word-input').querySelectorAll('input');
+  const inputsArr = Array.from(inputs);
+  const currentInputIdx = inputsArr.findIndex(inp => parseInt(inp.dataset.index) === currentIdx);
+  if (currentInputIdx > 0) {
+    const prevInput = inputsArr[currentInputIdx - 1];
+    prevInput.focus();
+    prevInput.value = '';
+  }
 }
 
 // 更新进度显示
@@ -1556,7 +1621,8 @@ function advanceToNextWord() {
     startWordReview(next);
   } else {
     setReviewFeedback('本轮复习完成！', 'ok');
-    $('review-input').disabled = true;
+    // 清空输入区域
+    $('review-word-input').innerHTML = '';
   }
 }
 
@@ -1771,15 +1837,28 @@ async function decreaseMemoryForWord(text) {
   }
 }
 
-// 单词复习：提交答案
+// 单词复习：提交答案 - 从各个输入框收集并验证
 async function submitReviewAnswer() {
   if (!state.currentReviewWord) return;
-  const input = $('review-input').value.trim().toLowerCase();
-  const answer = state.currentReviewWord.word.toLowerCase();
-  if (!input) return;
 
-  if (input === answer) {
+  const inputs = $('review-word-input').querySelectorAll('input');
+  const inputsArr = Array.from(inputs);
+
+  // 检查是否所有输入框都已填写
+  const allFilled = inputsArr.every(inp => inp.value.trim() !== '');
+  if (!allFilled) {
+    setReviewFeedback('请填写所有空位', 'err');
+    return;
+  }
+
+  // 收集用户答案
+  const userAnswer = inputsArr.map(inp => inp.value.toLowerCase()).join('');
+  const answer = state.currentReviewWord.word.toLowerCase();
+
+  if (userAnswer === answer) {
     setReviewFeedback('✓ 正确！', 'ok');
+    // 标记所有输入框为正确
+    inputsArr.forEach(inp => inp.classList.add('correct'));
     state.currentReviewWord.node.data('memory_strength', 1.0);
     if (state.cy) state.cy.style().update();
     trackSentenceWordReviewed(state.currentReviewWord.word);
@@ -1795,11 +1874,20 @@ async function submitReviewAnswer() {
     setTimeout(() => advanceToNextWord(), 400);
   } else {
     setReviewFeedback('✗ 错误，正确答案：' + answer, 'err');
+    // 标记错误的输入框
+    inputsArr.forEach((inp, i) => {
+      const expected = answer[i];
+      if (inp.value.toLowerCase() === expected) {
+        inp.classList.add('correct');
+      } else {
+        inp.classList.add('wrong');
+        inp.value = expected; // 显示正确答案
+      }
+    });
     state.currentReviewWord.node.data('memory_strength', 0.1);
     if (state.cy) state.cy.style().update();
     state.reviewStats.wrong++;
     await decreaseMemoryForWord(state.currentReviewWord.word);
-    $('review-hint').textContent = answer.split('').join(' ');
     setTimeout(() => advanceToNextWord(), 1500);
   }
 }
@@ -1810,9 +1898,11 @@ function switchMode(mode) {
 
   $('search-wrap').style.display = state.reviewMode ? 'none' : '';
   $('review-wrap').classList.toggle('hidden', !state.reviewMode);
-  $('layout-bar').style.display = state.reviewMode ? 'none' : '';
+  // layout-bar 在两种模式下都显示（复习模式用它决定选词策略）
   $('grow-btn').style.display = state.reviewMode ? 'none' : '';
   $('legend').style.display = state.reviewMode ? 'none' : '';
+  // topbar 在复习模式下隐藏（Tab 已经提供了导航）
+  $('topbar').style.display = state.reviewMode ? 'none' : '';
 
   document.querySelectorAll('.mode-tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.mode === mode);
@@ -1830,19 +1920,12 @@ function switchMode(mode) {
     if (state.cy) {
       state.cy.elements().removeClass('dimmed').removeClass('highlighted').removeClass('review-highlight');
     }
-    $('review-input').disabled = false;
   }
 }
 
 // 绑定 Tab 点击事件
 document.querySelectorAll('.mode-tab').forEach(tab => {
   tab.addEventListener('click', () => switchMode(tab.dataset.mode));
-});
-
-// 复习模式输入事件
-$('review-submit').addEventListener('click', submitReviewAnswer);
-$('review-input').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') submitReviewAnswer();
 });
 
 // 例句复习关闭按钮
