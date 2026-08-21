@@ -31,12 +31,21 @@ class GraphDB:
             return [dict(record) for record in result]
 
     def init_constraints(self) -> None:
-        """创建唯一约束（幂等，可重复调用）。"""
+        """创建唯一约束（幂等，可重复调用）。
+
+        注意：现在需要按 user_id 隔离数据，所以唯一约束改为 (text, user_id) 组合。
+        先删除旧的单属性约束，再创建新的复合约束。
+        """
+        # 删除旧的单属性约束（如果存在）
+        self.run("DROP CONSTRAINT word_text_unique IF EXISTS")
+        self.run("DROP CONSTRAINT category_name_unique IF EXISTS")
+
+        # 创建新的复合唯一约束：(text, user_id) 和 (name, user_id)
         self.run(
-            "CREATE CONSTRAINT word_text_unique IF NOT EXISTS "
-            "FOR (w:Word) REQUIRE w.text IS UNIQUE"
+            "CREATE CONSTRAINT word_text_user_unique IF NOT EXISTS "
+            "FOR (w:Word) REQUIRE (w.text, w.user_id) IS UNIQUE"
         )
         self.run(
-            "CREATE CONSTRAINT category_name_unique IF NOT EXISTS "
-            "FOR (c:Category) REQUIRE c.name IS UNIQUE"
+            "CREATE CONSTRAINT category_name_user_unique IF NOT EXISTS "
+            "FOR (c:Category) REQUIRE (c.name, c.user_id) IS UNIQUE"
         )
