@@ -9,6 +9,15 @@ graph_memory 是一个英文单词记忆图服务。核心是 `autoMake` 自生�
 - **例句图**：单词 ↔ 例句 ↔ 分类
 - **单词图**：单词之间通过共享英文前缀/后缀互相关联
 
+## 设计文档（`docs/`）
+
+本文件是速查手册；成体系的图文说明在 `docs/`，改动架构时记得同步：
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — 分层架构图、模块依赖图、Neo4j 数据模型 ER 图、前端结构、测试架构
+- [`docs/DATAFLOW.md`](docs/DATAFLOW.md) — 全局数据流、autoMake 写路径、四条读路径、自生长闭环
+- [`docs/FLOWCHART.md`](docs/FLOWCHART.md) — autoMake 完整流程、种子选择决策树、强度采样、复习循环、前端交互流程
+- [`docs/README.md`](docs/README.md) — 文档索引
+
 ## 技术栈
 
 - Python 3.10+，FastAPI（Web 服务）
