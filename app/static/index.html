@@ -39,6 +39,20 @@
     bottom: 0;
   }
 
+  /* 模式容器控制 */
+  #explore-view, #review-view {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  #explore-view.hidden, #review-view.hidden {
+    display: none;
+  }
+  #explore-view > *, #review-view > * {
+    pointer-events: auto;
+  }
+
+  /* ==================== 探索模式样式 ==================== */
   #topbar {
     position: absolute;
     top: 50px;
@@ -222,7 +236,31 @@
     background: var(--blue-dim); color: #fff; font-weight: 600;
   }
 
-  /* 复习模式：单词输入区 - 直接在隐藏字母位置输入 */
+  /* ==================== 复习模式样式 ==================== */
+  #review-topbar {
+    position: absolute;
+    top: 50px;
+    left: 14px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    pointer-events: none;
+  }
+  #review-topbar h1 { font-size: 15px; font-weight: 600; margin: 0; color: var(--ink); }
+  #review-topbar .hint { font-size: 12px; color: var(--ink-3); }
+  #review-topbar .back {
+    pointer-events: auto;
+    font-size: 13px;
+    color: var(--ink-2);
+    text-decoration: none;
+    padding: 4px 10px;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    background: var(--panel);
+  }
+  #review-topbar .back:hover { color: var(--ink); border-color: var(--blue-dim); }
+
   #review-wrap {
     position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
     z-index: 14; width: 380px;
@@ -323,7 +361,19 @@
   #sr-feedback.ok { color: var(--good); }
   #sr-feedback.err { color: var(--critical); }
 
-  /* 布局切换 */
+  /* 复习模式布局选项 */
+  #review-layout-bar {
+    position: absolute; top: 50px; right: 14px; z-index: 12;
+    display: flex; flex-direction: column; gap: 6px;
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  #review-layout-bar .lb-title { font-size: 11px; color: var(--ink-3); }
+  #review-layout-bar label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--ink-2); cursor: pointer;
+  }
+  #review-layout-bar input { accent-color: var(--blue-dim); margin: 0; }
   #layout-bar {
     position: absolute; top: 50px; right: 14px; z-index: 12;
     display: flex; flex-direction: column; gap: 6px;
@@ -456,84 +506,101 @@
 <div id="edge-tooltip" class="hidden"></div>
 <div id="loading">加载图中…</div>
 
-<div id="topbar">
-  <a class="back" href="/">← 笔记列表</a>
-  <h1 id="title">graph_memory</h1>
-  <span class="hint">圆形单词填空 · 方形例句看内容 · 右上「＋」增词</span>
-</div>
-
-<div id="search-wrap">
-  <input id="search-input" type="text" placeholder="搜索单词…（↑↓ 选择，回车定位）"
-         autocomplete="off" spellcheck="false">
-  <div id="search-results" class="hidden"></div>
-</div>
-
-<!-- 复习模式：直接在隐藏字母位置输入 -->
-<div id="review-wrap" class="hidden">
-  <div id="review-progress">
-    <span id="review-count">0/0</span>
-    <span id="review-mode-label">单词复习</span>
+<!-- ==================== 探索模式容器 ==================== -->
+<div id="explore-view">
+  <div id="topbar">
+    <a class="back" href="/">← 笔记列表</a>
+    <h1 id="title">graph_memory</h1>
+    <span class="hint">圆形单词填空 · 方形例句看内容 · 右上「＋」增词</span>
   </div>
-  <div id="review-word-input"></div>
-  <div id="review-def-cn"></div>
-  <div id="review-def-en"></div>
-  <div id="review-feedback"></div>
-</div>
 
-<button id="grow-btn" title="增加新的单词">＋</button>
-
-<!-- 布局选项在两种模式下都显示，复习模式用它决定选词策略 -->
-<div id="layout-bar">
-  <span class="lb-title">排布方式</span>
-  <label><input type="radio" name="layout" value="force" checked> 力导向</label>
-  <label><input type="radio" name="layout" value="memory"> 按记忆度</label>
-  <label><input type="radio" name="layout" value="weight"> 按权重</label>
-</div>
-
-<div id="legend">
-  <div class="row"><span class="bar"></span></div>
-  <div class="bar-labels"><span>记忆度低</span><span>记忆度高</span></div>
-  <div class="row"><span class="dot" style="background:#eb6834"></span> 分类</div>
-  <div class="row"><span class="dot" style="background:#3987e5"></span> 单词（圆形）</div>
-  <div class="row"><span class="sq" style="background:#3987e5"></span> 例句（方形，点击看内容、句中单词可跳转）</div>
-</div>
-
-<div id="quiz-panel" class="hidden">
-  <div class="quiz-head">
-    <span class="quiz-label">单词填空</span>
-    <span class="head-btns">
-      <button id="quiz-add" class="panel-add" title="用这个单词生成新例句">＋</button>
-      <button id="quiz-close" class="panel-close" title="关闭">×</button>
-    </span>
+  <div id="search-wrap">
+    <input id="search-input" type="text" placeholder="搜索单词…（↑↓ 选择，回车定位）"
+           autocomplete="off" spellcheck="false">
+    <div id="search-results" class="hidden"></div>
   </div>
-  <div id="quiz-pos"></div>
-  <div id="quiz-hint"></div>
-  <div id="quiz-def-en"></div>
-  <input id="quiz-input" type="text" placeholder="输入英文单词，回车提交" autocomplete="off" spellcheck="false">
-  <button id="quiz-submit">提交</button>
-  <div id="quiz-feedback"></div>
-  <div id="quiz-memory"></div>
+
+  <button id="grow-btn" title="增加新的单词">＋</button>
+
+  <div id="layout-bar">
+    <span class="lb-title">排布方式</span>
+    <label><input type="radio" name="layout" value="force" checked> 力导向</label>
+    <label><input type="radio" name="layout" value="memory"> 按记忆度</label>
+    <label><input type="radio" name="layout" value="weight"> 按权重</label>
+  </div>
+
+  <div id="legend">
+    <div class="row"><span class="bar"></span></div>
+    <div class="bar-labels"><span>记忆度低</span><span>记忆度高</span></div>
+    <div class="row"><span class="dot" style="background:#eb6834"></span> 分类</div>
+    <div class="row"><span class="dot" style="background:#3987e5"></span> 单词（圆形）</div>
+    <div class="row"><span class="sq" style="background:#3987e5"></span> 例句（方形，点击看内容、句中单词可跳转）</div>
+  </div>
+
+  <div id="quiz-panel" class="hidden">
+    <div class="quiz-head">
+      <span class="quiz-label">单词填空</span>
+      <span class="head-btns">
+        <button id="quiz-add" class="panel-add" title="用这个单词生成新例句">＋</button>
+        <button id="quiz-close" class="panel-close" title="关闭">×</button>
+      </span>
+    </div>
+    <div id="quiz-pos"></div>
+    <div id="quiz-hint"></div>
+    <div id="quiz-def-en"></div>
+    <input id="quiz-input" type="text" placeholder="输入英文单词，回车提交" autocomplete="off" spellcheck="false">
+    <button id="quiz-submit">提交</button>
+    <div id="quiz-feedback"></div>
+    <div id="quiz-memory"></div>
+  </div>
+
+  <div id="sentence-panel" class="hidden">
+    <div class="quiz-head">
+      <span class="quiz-label">例句</span>
+      <button id="sentence-close" class="panel-close" title="关闭">×</button>
+    </div>
+    <div id="sentence-en"></div>
+    <div id="sentence-zh"></div>
+  </div>
 </div>
 
-<div id="sentence-panel" class="hidden">
-  <div class="quiz-head">
-    <span class="quiz-label">例句</span>
-    <button id="sentence-close" class="panel-close" title="关闭">×</button>
+<!-- ==================== 复习模式容器 ==================== -->
+<div id="review-view" class="hidden">
+  <div id="review-topbar">
+    <a class="back" href="/">← 笔记列表</a>
+    <h1 id="review-title">graph_memory</h1>
+    <span class="hint">复习模式 · 根据布局选择单词 · 直接在空位输入字母</span>
   </div>
-  <div id="sentence-en"></div>
-  <div id="sentence-zh"></div>
-</div>
 
-<div id="sentence-review-panel" class="hidden">
-  <div class="quiz-head">
-    <span class="quiz-label">句子复习</span>
-    <button id="sentence-review-close" class="panel-close" title="关闭">×</button>
+  <div id="review-wrap">
+    <div id="review-progress">
+      <span id="review-count">0/0</span>
+      <span id="review-mode-label">单词复习</span>
+    </div>
+    <div id="review-word-input"></div>
+    <div id="review-def-cn"></div>
+    <div id="review-def-en"></div>
+    <div id="review-feedback"></div>
   </div>
-  <div id="sr-sentence"></div>
-  <div id="sr-translation"></div>
-  <div id="sr-inputs"></div>
-  <button id="sr-submit">提交全部</button>
-  <div id="sr-feedback"></div>
+
+  <div id="review-layout-bar">
+    <span class="lb-title">选词策略</span>
+    <label><input type="radio" name="review-layout" value="force" checked> 随机</label>
+    <label><input type="radio" name="review-layout" value="memory"> 低记忆度优先</label>
+    <label><input type="radio" name="review-layout" value="weight"> 低权重优先</label>
+  </div>
+
+  <div id="sentence-review-panel" class="hidden">
+    <div class="quiz-head">
+      <span class="quiz-label">句子复习</span>
+      <button id="sentence-review-close" class="panel-close" title="关闭">×</button>
+    </div>
+    <div id="sr-sentence"></div>
+    <div id="sr-translation"></div>
+    <div id="sr-inputs"></div>
+    <button id="sr-submit">提交全部</button>
+    <div id="sr-feedback"></div>
+  </div>
 </div>
 
 <div id="grow-modal" class="hidden">
@@ -647,7 +714,10 @@ async function apiFetch(url, options = {}) {
 }
 
 const CATEGORY = new URLSearchParams(location.search).get('category');
-if (CATEGORY) $('title').textContent = CATEGORY;
+if (CATEGORY) {
+  $('title').textContent = CATEGORY;
+  if ($('review-title')) $('review-title').textContent = CATEGORY;
+}
 
 async function loadGraph() {
   const url = CATEGORY ? '/api/graph?category=' + encodeURIComponent(CATEGORY) : '/api/graph';
@@ -1206,6 +1276,15 @@ document.querySelectorAll('input[name="layout"]').forEach((el) => {
   el.addEventListener('change', () => { if (el.checked) applyLayout(el.value); });
 });
 
+// 复习模式布局切换：重新构建复习队列
+document.querySelectorAll('input[name="review-layout"]').forEach((el) => {
+  el.addEventListener('change', () => {
+    if (el.checked && state.reviewMode && state.cy) {
+      initializeReviewMode();
+    }
+  });
+});
+
 // --- 增词：右上角「+」= 给整张图增词；单词面板「+」= 围绕该词造句 ---
 // 两者共用一个弹窗，区别只在有没有「焦点词」。
 // 滑块 = 例句对高权重单词的依赖程度：高则种子取核心高频词，低则取边缘生词。
@@ -1413,7 +1492,9 @@ function shuffleArray(arr) {
 
 // 获取当前布局模式（从 radio 按钮读取）
 function getLayoutMode() {
-  const checked = document.querySelector('input[name="layout"]:checked');
+  // 探索模式用 layout，复习模式用 review-layout
+  const radioName = state.reviewMode ? 'review-layout' : 'layout';
+  const checked = document.querySelector(`input[name="${radioName}"]:checked`);
   return checked ? checked.value : 'force';
 }
 
@@ -1899,12 +1980,9 @@ async function submitReviewAnswer() {
 function switchMode(mode) {
   state.reviewMode = (mode === 'review');
 
-  $('search-wrap').style.display = state.reviewMode ? 'none' : '';
-  $('review-wrap').classList.toggle('hidden', !state.reviewMode);
-  // layout-bar 在两种模式下都显示（复习模式用它决定选词策略）
-  $('grow-btn').style.display = state.reviewMode ? 'none' : '';
-  $('legend').style.display = state.reviewMode ? 'none' : '';
-  // topbar 在两种模式下都显示（返回首页、标题、介绍）
+  // 切换模式容器
+  $('explore-view').classList.toggle('hidden', state.reviewMode);
+  $('review-view').classList.toggle('hidden', !state.reviewMode);
 
   document.querySelectorAll('.mode-tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.mode === mode);
