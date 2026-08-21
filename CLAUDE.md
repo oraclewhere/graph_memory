@@ -41,6 +41,7 @@ uvicorn app.main:app --reload
 - **pip 源**：本环境默认源 `pypi.org` 被墙，需加 `-i https://pypi.tuna.tsinghua.edu.cn/simple`（阿里镜像也可用）。
 - **venv**：`python3.10 -m venv` 可能因缺少 `ensurepip` 失败，需先 `apt install python3.10-venv`。装不上时可直接用系统 `python3.10 -m pip install`（本环境已用此方式装好依赖）。
 
+- **git 管理**： 每次对话后修改的代码需要提交到git仓库，并合并到当前分支
 ## 测试
 
 ```bash
