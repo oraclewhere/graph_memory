@@ -432,7 +432,7 @@
 
 <div id="modal" class="hidden">
   <div class="modal-card">
-    <div class="modal-title">✗ 填写错误</div>
+    <div class="modal-title" id="modal-title">✗ 填写错误</div>
     <div id="modal-answer"></div>
     <div class="modal-btns">
       <button id="btn-retry">再试一次</button>
@@ -1182,6 +1182,10 @@ $('sentence-close').onclick = closeSentencePanel;
 
 $('btn-retry').onclick = () => {
   $('modal').classList.add('hidden');
+  // 恢复按钮原始状态
+  $('modal-title').textContent = '✗ 填写错误';
+  $('btn-show-answer').style.display = '';
+  $('btn-retry').textContent = '再试一次';
   $('quiz-input').value = '';
   $('quiz-input').focus();
   state.pending = null;
@@ -1189,10 +1193,12 @@ $('btn-retry').onclick = () => {
 
 $('btn-show-answer').onclick = () => {
   // 显示答案不算复习成功，不跳转下一个，让用户继续复习这个词
-  // 在 feedback 区域显示正确答案，而不是在错误弹窗里
-  state.pending = null;
-  $('modal').classList.add('hidden');
-  setFeedback('正确答案：<b style="color:var(--blue-bright)">' + state.pendingAnswer + '</b>，请记忆后再次输入', '');
+  // 在错误弹窗里显示正确答案，弹窗保持打开
+  $('modal-title').textContent = '正确答案';
+  $('modal-answer').innerHTML = '<b style="color:var(--blue-bright);font-size:22px">' + escapeHtml(state.pendingAnswer) + '</b>';
+  // 隐藏"显示正确答案"按钮，只保留"再试一次"
+  $('btn-show-answer').style.display = 'none';
+  $('btn-retry').textContent = '我记住了，再试一次';
   $('quiz-input').value = '';
   $('quiz-input').focus();
 };
