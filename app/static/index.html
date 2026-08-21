@@ -33,7 +33,10 @@
 
   #cy {
     position: absolute;
-    inset: 0;
+    top: 100px;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 
   #topbar {
@@ -1901,8 +1904,7 @@ function switchMode(mode) {
   // layout-bar 在两种模式下都显示（复习模式用它决定选词策略）
   $('grow-btn').style.display = state.reviewMode ? 'none' : '';
   $('legend').style.display = state.reviewMode ? 'none' : '';
-  // topbar 在复习模式下隐藏（Tab 已经提供了导航）
-  $('topbar').style.display = state.reviewMode ? 'none' : '';
+  // topbar 在两种模式下都显示（返回首页、标题、介绍）
 
   document.querySelectorAll('.mode-tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.mode === mode);
