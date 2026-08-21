@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app import db as db_module
 from app.models import graph
@@ -67,6 +67,34 @@ def review_word(
         text=text,
         memory_strength=memory_strength,
         last_reviewed_at=now,
+        user_id=user_id,
+    )
+    return rows[0] if rows else None
+
+
+def decrease_memory(
+    gdb: db_module.GraphDB,
+    text: str,
+    target_memory: float = 0.1,
+    half_life_days: float = DEFAULT_HALF_LIFE_DAYS,
+    user_id: int | None = None,
+) -> dict | None:
+    """复习失败：降低记忆度到目标值。
+
+    反推 last_reviewed_at 使得 memory_strength_at(past_time) ≈ target_memory。
+    公式：Δt = -ln(target_memory) × half_life_days
+    即把 last_reviewed_at 设为 now - Δt 天前。
+    """
+    target_memory = max(0.01, min(0.99, float(target_memory)))
+    delta_days = -math.log(target_memory) * half_life_days
+    now = datetime.now(timezone.utc)
+    past_time = now - timedelta(days=delta_days)
+
+    rows = gdb.run(
+        graph.REVIEW_WORD,
+        text=text,
+        memory_strength=target_memory,
+        last_reviewed_at=past_time.isoformat(),
         user_id=user_id,
     )
     return rows[0] if rows else None

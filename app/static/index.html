@@ -201,6 +201,112 @@
            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sr-empty { padding: 8px 12px; font-size: 12px; color: var(--ink-3); }
 
+  /* 模式切换 Tab */
+  #mode-tabs {
+    position: absolute; top: 52px; left: 50%; transform: translateX(-50%);
+    z-index: 14; display: flex; gap: 0;
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .mode-tab {
+    padding: 5px 14px; font-size: 12px; font-weight: 500;
+    background: transparent; color: var(--ink-3); border: none;
+    cursor: pointer; transition: all 0.15s ease;
+  }
+  .mode-tab:hover { color: var(--ink-2); background: rgba(255,255,255,0.04); }
+  .mode-tab.active {
+    background: var(--blue-dim); color: #fff; font-weight: 600;
+  }
+
+  /* 复习模式：单词输入区 */
+  #review-wrap {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 14; width: 320px;
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 10px; padding: 12px 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  #review-wrap.hidden { display: none; }
+  #review-progress {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px; font-size: 11px; color: var(--ink-3);
+  }
+  #review-count { color: var(--blue-bright); font-weight: 600; font-size: 12px; }
+  #review-hint {
+    font-size: 22px; font-weight: 700; color: var(--ink);
+    letter-spacing: 3px; margin-bottom: 4px; word-break: break-all;
+    font-family: 'Courier New', monospace;
+  }
+  #review-def-cn { font-size: 14px; color: var(--ink-2); margin-bottom: 2px; }
+  #review-def-en { font-size: 11px; color: var(--ink-3); margin-bottom: 8px; }
+  #review-input-wrap { display: flex; gap: 6px; }
+  #review-input {
+    flex: 1; padding: 8px 12px; font-size: 15px;
+    background: #141414; color: var(--ink);
+    border: 1px solid var(--panel-border); border-radius: 8px; outline: none;
+  }
+  #review-input:focus { border-color: var(--blue-bright); }
+  #review-submit {
+    padding: 8px 14px; font-size: 14px; font-weight: 600;
+    background: var(--blue-dim); color: #fff; border: none;
+    border-radius: 8px; cursor: pointer; white-space: nowrap;
+  }
+  #review-submit:hover { background: #2f7ad4; }
+  #review-feedback {
+    margin-top: 6px; font-size: 13px; min-height: 18px;
+  }
+  #review-feedback.ok { color: var(--good); }
+  #review-feedback.err { color: var(--critical); }
+  #review-sentence-progress {
+    margin-top: 6px; font-size: 11px; color: var(--ink-3);
+    border-top: 1px solid var(--panel-border); padding-top: 4px;
+  }
+
+  /* 复习模式：例句复习面板 */
+  #sentence-review-panel {
+    position: fixed; width: 420px; max-width: 90vw;
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 12px; padding: 18px; z-index: 25;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.65);
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    transition: opacity 0.15s ease;
+  }
+  #sentence-review-panel.hidden { opacity: 0; pointer-events: none; }
+  #sr-sentence {
+    font-size: 16px; line-height: 2.0; color: var(--ink); margin: 6px 0 12px;
+  }
+  #sr-sentence .blank-slot {
+    display: inline-block; min-width: 50px; border-bottom: 2px solid var(--blue-bright);
+    color: var(--blue-bright); font-weight: 600; text-align: center;
+    padding: 0 4px; margin: 0 2px;
+  }
+  #sr-translation {
+    font-size: 13px; color: var(--ink-2); border-top: 1px solid var(--panel-border);
+    padding-top: 10px; margin-bottom: 14px;
+  }
+  #sr-inputs { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .sr-input-row {
+    display: flex; align-items: center; gap: 8px; font-size: 13px;
+  }
+  .sr-input-row label { color: var(--ink-3); min-width: 28px; text-align: right; }
+  .sr-input-row input {
+    flex: 1; padding: 7px 10px; font-size: 14px;
+    background: #141414; color: var(--ink);
+    border: 1px solid var(--panel-border); border-radius: 6px; outline: none;
+  }
+  .sr-input-row input:focus { border-color: var(--blue-bright); }
+  .sr-input-row .sr-correct { color: var(--good); font-weight: 600; }
+  .sr-input-row .sr-wrong { color: var(--critical); text-decoration: line-through; }
+  #sr-submit {
+    width: 100%; padding: 10px; font-size: 14px; font-weight: 600;
+    background: var(--blue-dim); color: #fff; border: none; border-radius: 8px;
+    cursor: pointer;
+  }
+  #sr-submit:hover { background: #2f7ad4; }
+  #sr-feedback { margin-top: 8px; font-size: 13px; min-height: 18px; }
+  #sr-feedback.ok { color: var(--good); }
+  #sr-feedback.err { color: var(--critical); }
+
   /* 布局切换 */
   #layout-bar {
     position: absolute; top: 60px; right: 14px; z-index: 12;
@@ -340,6 +446,30 @@
   <div id="search-results" class="hidden"></div>
 </div>
 
+<div id="mode-tabs">
+  <button class="mode-tab active" data-mode="explore">探索模式</button>
+  <button class="mode-tab" data-mode="review">复习模式</button>
+</div>
+
+<div id="review-wrap" class="hidden">
+  <div id="review-progress">
+    <span id="review-count">0/0</span>
+    <span id="review-mode-label">单词复习</span>
+  </div>
+  <div id="review-challenge">
+    <div id="review-hint"></div>
+    <div id="review-def-cn"></div>
+    <div id="review-def-en"></div>
+  </div>
+  <div id="review-input-wrap">
+    <input id="review-input" type="text" placeholder="输入完整单词，回车提交"
+           autocomplete="off" spellcheck="false">
+    <button id="review-submit">提交</button>
+  </div>
+  <div id="review-feedback"></div>
+  <div id="review-sentence-progress"></div>
+</div>
+
 <button id="grow-btn" title="增加新的单词">＋</button>
 
 <div id="layout-bar">
@@ -381,6 +511,18 @@
   </div>
   <div id="sentence-en"></div>
   <div id="sentence-zh"></div>
+</div>
+
+<div id="sentence-review-panel" class="hidden">
+  <div class="quiz-head">
+    <span class="quiz-label">句子复习</span>
+    <button id="sentence-review-close" class="panel-close" title="关闭">×</button>
+  </div>
+  <div id="sr-sentence"></div>
+  <div id="sr-translation"></div>
+  <div id="sr-inputs"></div>
+  <button id="sr-submit">提交全部</button>
+  <div id="sr-feedback"></div>
 </div>
 
 <div id="grow-modal" class="hidden">
@@ -452,7 +594,19 @@ function memColor(m) {
   return MEM_RAMP[idx];
 }
 
-const state = { cy: null, current: null, pending: null, pendingAnswer: '', unfollowPanel: null };
+const state = { cy: null, current: null, pending: null, pendingAnswer: '', unfollowPanel: null,
+  // 复习模式状态
+  reviewMode: false,
+  reviewQueue: [],
+  reviewIndex: 0,
+  reviewedWords: new Set(),
+  sentenceWordMap: {},
+  sentenceReviewedMap: {},
+  sentenceDoneSet: new Set(),
+  currentReviewWord: null,
+  currentSentenceReview: null,
+  reviewStats: { correct: 0, wrong: 0, sentencesCompleted: 0 },
+};
 const $ = (id) => document.getElementById(id);
 
 // 登录检查
@@ -1234,6 +1388,471 @@ $('btn-show-answer').onclick = () => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') handleEscape();
 });
+
+// ===================== 复习模式 =====================
+
+// 工具函数：Fisher-Yates 洗牌
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// 获取当前布局模式（从 radio 按钮读取）
+function getLayoutMode() {
+  const checked = document.querySelector('input[name="layout"]:checked');
+  return checked ? checked.value : 'force';
+}
+
+// 构建复习队列
+function buildReviewQueue() {
+  const allWords = [];
+  state.cy.nodes('[label="Word"]').forEach(node => {
+    allWords.push({
+      text: node.data('text'),
+      memory: node.data('memory_strength') ?? 0,
+      weight: node.data('weight') ?? 0,
+      node: node,
+    });
+  });
+
+  const mode = getLayoutMode();
+  if (mode === 'force') {
+    shuffleArray(allWords);
+  } else if (mode === 'memory') {
+    allWords.sort((a, b) => a.memory - b.memory);
+  } else if (mode === 'weight') {
+    allWords.sort((a, b) => a.weight - b.weight || a.memory - b.memory);
+  }
+
+  state.reviewQueue = allWords;
+  state.reviewIndex = 0;
+}
+
+// 构建例句-单词映射
+function buildSentenceWordMap() {
+  state.sentenceWordMap = {};
+  state.sentenceReviewedMap = {};
+  state.cy.nodes('[label="Sentence"]').forEach(node => {
+    const words = node.data('words') || [];
+    if (words.length > 0) {
+      state.sentenceWordMap[node.id()] = [...words];
+      state.sentenceReviewedMap[node.id()] = new Set();
+    }
+  });
+  state.sentenceDoneSet = new Set();
+}
+
+// 初始化复习模式
+function initializeReviewMode() {
+  state.reviewedWords = new Set();
+  state.reviewStats = { correct: 0, wrong: 0, sentencesCompleted: 0 };
+  buildReviewQueue();
+  buildSentenceWordMap();
+  if (state.reviewQueue.length === 0) {
+    setReviewFeedback('当前分类没有可复习的单词', 'err');
+    return;
+  }
+  advanceToNextWord();
+}
+
+// 字母隐藏算法
+function generateHiddenWord(word) {
+  const len = word.length;
+  if (len <= 1) {
+    return { display: word, hiddenIndices: [] };
+  }
+  if (len === 2) {
+    return { display: word[0] + ' _', hiddenIndices: [1] };
+  }
+  if (len === 3) {
+    return { display: word[0] + ' _ _', hiddenIndices: [1, 2] };
+  }
+  // 4+ 字母：隐藏 80%+
+  const totalHide = Math.max(1, Math.ceil(len * 0.8));
+  const candidates = Array.from({ length: len - 1 }, (_, i) => i + 1);
+  shuffleArray(candidates);
+  const hiddenSet = new Set(candidates.slice(0, totalHide));
+
+  let display = '';
+  const hiddenIndices = [];
+  for (let i = 0; i < len; i++) {
+    if (i > 0) display += ' ';
+    if (hiddenSet.has(i)) {
+      display += '_';
+      hiddenIndices.push(i);
+    } else {
+      display += word[i];
+    }
+  }
+  return { display, hiddenIndices };
+}
+
+// 开始单词复习
+function startWordReview(entry) {
+  const node = entry.node;
+  const word = entry.text;
+  const { display } = generateHiddenWord(word);
+
+  state.currentReviewWord = {
+    node, word,
+    defCn: node.data('definition_cn') || '',
+    defEn: node.data('definition_en') || '',
+  };
+
+  $('review-hint').textContent = display;
+  $('review-def-cn').textContent = state.currentReviewWord.defCn
+    ? '释义：' + state.currentReviewWord.defCn
+    : '（暂无中文释义）';
+  $('review-def-en').textContent = state.currentReviewWord.defEn || '';
+  $('review-input').value = '';
+  setReviewFeedback('', '');
+  updateReviewProgress();
+
+  // 高亮节点
+  if (state.cy) {
+    state.cy.elements().removeClass('review-highlight');
+    node.addClass('review-highlight');
+    state.cy.animate({ center: { eles: node }, zoom: 1.1 }, { duration: 250 });
+  }
+
+  $('review-input').focus();
+}
+
+// 更新进度显示
+function updateReviewProgress() {
+  const total = state.reviewQueue.length;
+  const current = Math.min(state.reviewIndex, total);
+  $('review-count').textContent = current + '/' + total;
+  $('review-mode-label').textContent =
+    state.currentSentenceReview ? '句子复习' : '单词复习';
+}
+
+// 设置反馈
+function setReviewFeedback(msg, cls) {
+  const fb = $('review-feedback');
+  fb.textContent = msg;
+  fb.className = cls || '';
+}
+
+// 获取下一个复习词
+function nextReviewWord() {
+  if (state.reviewIndex >= state.reviewQueue.length) {
+    state.reviewIndex = 0;
+    buildReviewQueue();
+  }
+  if (state.reviewQueue.length === 0) return null;
+  const entry = state.reviewQueue[state.reviewIndex];
+  state.reviewIndex++;
+  return entry;
+}
+
+// 跳到下一个词
+function advanceToNextWord() {
+  const next = nextReviewWord();
+  if (next) {
+    startWordReview(next);
+  } else {
+    setReviewFeedback('本轮复习完成！', 'ok');
+    $('review-input').disabled = true;
+  }
+}
+
+// 追踪例句进度
+function trackSentenceWordReviewed(wordText) {
+  for (const [sentId, words] of Object.entries(state.sentenceWordMap)) {
+    if (words.includes(wordText)) {
+      state.sentenceReviewedMap[sentId].add(wordText);
+    }
+  }
+}
+
+// 检查是否有例句完成
+function findCompletedSentence() {
+  for (const [sentId, words] of Object.entries(state.sentenceWordMap)) {
+    if (state.sentenceDoneSet.has(sentId)) continue;
+    const reviewed = state.sentenceReviewedMap[sentId];
+    if (reviewed && reviewed.size === words.length && words.length > 0) {
+      state.sentenceDoneSet.add(sentId);
+      return sentId;
+    }
+  }
+  return null;
+}
+
+// 选择例句中的空位
+function selectSentenceBlanks(sentenceNode) {
+  const words = sentenceNode.data('words') || [];
+  const wordMemories = words.map(w => {
+    const node = state.cy.getElementById('word:' + w);
+    return {
+      text: w,
+      memory: node.length ? (node.data('memory_strength') ?? 0) : 0,
+    };
+  });
+
+  const totalToHide = Math.max(1, Math.ceil(words.length / 2));
+  const memories = wordMemories.map(w => w.memory);
+  const allSameMemory = memories.every(m => Math.abs(m - memories[0]) < 0.01);
+
+  let blanks;
+  if (allSameMemory) {
+    const shuffled = [...wordMemories];
+    shuffleArray(shuffled);
+    blanks = shuffled.slice(0, totalToHide);
+  } else {
+    wordMemories.sort((a, b) => a.memory - b.memory);
+    blanks = wordMemories.slice(0, totalToHide);
+  }
+  return blanks.map(b => b.text);
+}
+
+// 简单的分词函数（按空格和标点）
+function tokenizeSentence(text) {
+  const tokens = [];
+  const regex = /([a-zA-Z]+)|([^a-zA-Z\s]+)|(\s+)/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match[1]) {
+      tokens.push({ type: 'word', value: match[1].toLowerCase(), original: match[1] });
+    } else if (match[2]) {
+      tokens.push({ type: 'punct', value: match[2] });
+    } else if (match[3]) {
+      tokens.push({ type: 'space', value: match[3] });
+    }
+  }
+  return tokens;
+}
+
+// 开始例句复习
+function startSentenceReview(sentenceId) {
+  const node = state.cy.getElementById(sentenceId);
+  if (!node.length) return;
+
+  const sentenceText = node.data('text');
+  const translation = node.data('translation') || '';
+  const blankWords = selectSentenceBlanks(node);
+
+  state.currentSentenceReview = { node, sentenceText, translation, blankWords };
+
+  const srSentence = $('sr-sentence');
+  const srInputs = $('sr-inputs');
+  srSentence.innerHTML = '';
+  srInputs.innerHTML = '';
+
+  const tokens = tokenizeSentence(sentenceText);
+  let blankIndex = 0;
+  const usedBlanks = new Set();
+
+  tokens.forEach(t => {
+    if (t.type === 'word' && blankWords.includes(t.value) && !usedBlanks.has(t.value + blankIndex)) {
+      blankIndex++;
+      usedBlanks.add(t.value + blankIndex);
+      const span = document.createElement('span');
+      span.className = 'blank-slot';
+      span.textContent = '[' + blankIndex + ']';
+      srSentence.appendChild(span);
+
+      const row = document.createElement('div');
+      row.className = 'sr-input-row';
+      row.dataset.answer = t.value;
+      const label = document.createElement('label');
+      label.textContent = '[' + blankIndex + ']';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = '输入单词';
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitSentenceReview();
+      });
+      row.appendChild(label);
+      row.appendChild(input);
+      srInputs.appendChild(row);
+    } else {
+      srSentence.appendChild(document.createTextNode(t.original || t.value));
+    }
+  });
+
+  $('sr-translation').textContent = translation;
+  $('sr-feedback').textContent = '';
+  $('sr-feedback').className = '';
+  $('sentence-review-panel').classList.remove('hidden');
+  $('review-mode-label').textContent = '句子复习';
+
+  const firstInput = srInputs.querySelector('input');
+  if (firstInput) setTimeout(() => firstInput.focus(), 100);
+
+  state.reviewStats.sentencesCompleted++;
+}
+
+// 提交例句复习
+function submitSentenceReview() {
+  if (!state.currentSentenceReview) return;
+
+  const rows = $('sr-inputs').querySelectorAll('.sr-input-row');
+  let allCorrect = true;
+  const results = [];
+
+  rows.forEach(row => {
+    const input = row.querySelector('input');
+    const answer = row.dataset.answer;
+    const userAnswer = input.value.trim().toLowerCase();
+
+    row.querySelector('.sr-correct')?.remove();
+    row.querySelector('.sr-wrong')?.remove();
+
+    if (userAnswer === answer) {
+      const mark = document.createElement('span');
+      mark.className = 'sr-correct';
+      mark.textContent = ' ✓';
+      row.appendChild(mark);
+      results.push({ correct: true, word: answer });
+    } else {
+      allCorrect = false;
+      const mark = document.createElement('span');
+      mark.className = 'sr-wrong';
+      mark.textContent = ' ✗ → ' + answer;
+      row.appendChild(mark);
+      results.push({ correct: false, word: answer, userAnswer });
+    }
+  });
+
+  if (allCorrect) {
+    $('sr-feedback').textContent = '✓ 全部正确！句子复习完成';
+    $('sr-feedback').className = 'ok';
+    results.forEach(r => markReviewedInReviewMode(r.word));
+
+    setTimeout(() => {
+      $('sentence-review-panel').classList.add('hidden');
+      state.currentSentenceReview = null;
+      advanceToNextWord();
+    }, 1200);
+  } else {
+    $('sr-feedback').textContent = '✗ 部分错误，请修正后重新提交';
+    $('sr-feedback').className = 'err';
+    results.filter(r => !r.correct).forEach(r => decreaseMemoryForWord(r.word));
+    rows.forEach(row => {
+      const input = row.querySelector('input');
+      const answer = row.dataset.answer;
+      if (input.value.trim().toLowerCase() !== answer) {
+        input.value = '';
+      }
+    });
+  }
+}
+
+// API 调用：复习成功
+async function markReviewedInReviewMode(text) {
+  const params = CATEGORY ? '?category=' + encodeURIComponent(CATEGORY) : '';
+  try {
+    const res = await apiFetch('/api/review' + params, {
+      method: 'POST',
+      body: JSON.stringify({ word: text }),
+    });
+    if (res) await res.json();
+  } catch (e) {
+    console.error('Failed to mark reviewed:', text, e);
+  }
+}
+
+// API 调用：降低记忆度
+async function decreaseMemoryForWord(text) {
+  try {
+    const res = await apiFetch('/api/review/decrease', {
+      method: 'POST',
+      body: JSON.stringify({ word: text, target_memory: 0.1 }),
+    });
+    if (res) await res.json();
+  } catch (e) {
+    console.error('Failed to decrease memory:', text, e);
+  }
+}
+
+// 单词复习：提交答案
+async function submitReviewAnswer() {
+  if (!state.currentReviewWord) return;
+  const input = $('review-input').value.trim().toLowerCase();
+  const answer = state.currentReviewWord.word.toLowerCase();
+  if (!input) return;
+
+  if (input === answer) {
+    setReviewFeedback('✓ 正确！', 'ok');
+    state.currentReviewWord.node.data('memory_strength', 1.0);
+    if (state.cy) state.cy.style().update();
+    trackSentenceWordReviewed(state.currentReviewWord.word);
+    state.reviewedWords.add(state.currentReviewWord.word);
+    state.reviewStats.correct++;
+    await markReviewedInReviewMode(state.currentReviewWord.word);
+
+    const triggeredSentence = findCompletedSentence();
+    if (triggeredSentence) {
+      setTimeout(() => startSentenceReview(triggeredSentence), 500);
+      return;
+    }
+    setTimeout(() => advanceToNextWord(), 400);
+  } else {
+    setReviewFeedback('✗ 错误，正确答案：' + answer, 'err');
+    state.currentReviewWord.node.data('memory_strength', 0.1);
+    if (state.cy) state.cy.style().update();
+    state.reviewStats.wrong++;
+    await decreaseMemoryForWord(state.currentReviewWord.word);
+    $('review-hint').textContent = answer.split('').join(' ');
+    setTimeout(() => advanceToNextWord(), 1500);
+  }
+}
+
+// 模式切换
+function switchMode(mode) {
+  state.reviewMode = (mode === 'review');
+
+  $('search-wrap').style.display = state.reviewMode ? 'none' : '';
+  $('review-wrap').classList.toggle('hidden', !state.reviewMode);
+  $('layout-bar').style.display = state.reviewMode ? 'none' : '';
+  $('grow-btn').style.display = state.reviewMode ? 'none' : '';
+  $('legend').style.display = state.reviewMode ? 'none' : '';
+
+  document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.mode === mode);
+  });
+
+  // 关闭探索模式面板
+  if (typeof closeQuiz === 'function') closeQuiz();
+  if (typeof closeSentencePanel === 'function') closeSentencePanel();
+  $('sentence-review-panel').classList.add('hidden');
+  state.currentSentenceReview = null;
+
+  if (state.reviewMode) {
+    if (state.cy) initializeReviewMode();
+  } else {
+    if (state.cy) {
+      state.cy.elements().removeClass('dimmed').removeClass('highlighted').removeClass('review-highlight');
+    }
+    $('review-input').disabled = false;
+  }
+}
+
+// 绑定 Tab 点击事件
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => switchMode(tab.dataset.mode));
+});
+
+// 复习模式输入事件
+$('review-submit').addEventListener('click', submitReviewAnswer);
+$('review-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitReviewAnswer();
+});
+
+// 例句复习关闭按钮
+$('sentence-review-close').addEventListener('click', () => {
+  $('sentence-review-panel').classList.add('hidden');
+  state.currentSentenceReview = null;
+});
+
+// 例句复习提交按钮
+$('sr-submit').addEventListener('click', submitSentenceReview);
 
 loadGraph().catch((e) => {
   $('loading').textContent = '加载失败：请确认后端服务已启动（uvicorn app.main:app）';

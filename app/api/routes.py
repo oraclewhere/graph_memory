@@ -22,6 +22,11 @@ class ReviewRequest(BaseModel):
     word: str
 
 
+class DecreaseMemoryRequest(BaseModel):
+    word: str
+    target_memory: float = 0.1
+
+
 class CandidateRequest(BaseModel):
     category: str
     n: int = 10
@@ -214,6 +219,26 @@ def review(
             "word": req.word,
             "memory_strength": updated["memory_strength"] if updated else None,
             "next": next_words[0] if next_words else None,
+        }
+    finally:
+        gdb.close()
+
+
+@router.post("/review/decrease")
+def decrease_memory(
+    req: DecreaseMemoryRequest,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """复习错误：降低该词记忆度到目标值（默认 0.1）。"""
+    gdb = db_module.GraphDB()
+    try:
+        result = memory.decrease_memory(
+            gdb, req.word, target_memory=req.target_memory, user_id=user.id
+        )
+        return {
+            "ok": result is not None,
+            "word": req.word,
+            "memory_strength": result["memory_strength"] if result else None,
         }
     finally:
         gdb.close()
