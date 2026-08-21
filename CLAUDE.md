@@ -9,20 +9,23 @@ graph_memory 是一个英文单词记忆图服务。核心是 `autoMake` 自生�
 - **例句图**：单词 ↔ 例句 ↔ 分类
 - **单词图**：单词之间通过共享英文前缀/后缀互相关联
 
+支持**多用户登录**，每个用户的图数据完全隔离。用户可以配置自己的 LLM API。
+
 ## 设计文档（`docs/`）
 
 本文件是速查手册；成体系的图文说明在 `docs/`，改动架构时记得同步：
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — 分层架构图、模块依赖图、Neo4j 数据模型 ER 图、前端结构、测试架构
-- [`docs/DATAFLOW.md`](docs/DATAFLOW.md) — 全局数据流、autoMake 写路径、四条读路径、自生长闭环
-- [`docs/FLOWCHART.md`](docs/FLOWCHART.md) — autoMake 完整流程、种子选择决策树、强度采样、复习循环、前端交互流程
+- [`docs/DATAFLOW.md`](docs/DATAFLOW.md) — 全局数据流、认证数据流、autoMake 写路径、四条读路径、自生长闭环
+- [`docs/FLOWCHART.md`](docs/FLOWCHART.md) — 登录流程、autoMake 完整流程、种子选择决策树、强度采样、复习循环、前端交互流程
 - [`docs/README.md`](docs/README.md) — 文档索引
 
 ## 技术栈
 
 - Python 3.10+，FastAPI（Web 服务）
-- Neo4j（图存储，通过 `docker compose` 启动）
-- 可配置 LLM（OpenAI 兼容接口，任意 `base_url` / `api_key` / `model`）
+- Neo4j（图存储，通过 `docker compose` 启动，数据按 user_id 隔离）
+- MySQL（用户信息存储，JWT 认证，通过 `docker compose` 启动）
+- 可配置 LLM（OpenAI 兼容接口，支持全局配置和用户自定义配置）
 - pytest（测试）
 
 ## 快速开始
@@ -32,16 +35,20 @@ graph_memory 是一个英文单词记忆图服务。核心是 `autoMake` 自生�
 python3.10 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 启动 Neo4j（账号 neo4j / password，见 docker-compose.yml）
+# 启动 Neo4j + MySQL（账号 neo4j/password 和 app/apppass，见 docker-compose.yml）
 docker compose up -d
 
-# 填入 LLM 配置：编辑 config/llm.yaml 的 api_base / api_key / model
+# 填入 LLM 配置：编辑 config/llm.yaml 的 api_base / api_key / model（全局默认配置）
 
 # 终端快速验证 autoMake（交互式）
 python -m app.cli
 
-# 启动 Web 服务（浏览器打开 http://localhost:8000 进入笔记列表首页，生成图后点击笔记跳转到 /graph 查看子图）
+# 启动 Web 服务
 uvicorn app.main:app --reload
+
+# 浏览器打开 http://localhost:8000 进入登录页
+# 注册新用户或登录（初始管理员：admin / admin123）
+# 登录后进入笔记列表首页，可在个人信息页配置自己的 LLM API
 ```
 
 ## 环境注意事项
@@ -110,23 +117,43 @@ python -m pytest -k <name>                    # 单个用例
 
 ### 查询接口（`app/api/routes.py`）
 
+所有接口都需要 JWT 认证（`Authorization: Bearer <token>`），数据按 user_id 隔离。
+
 - `GET /api/graph?category=` — 返回图 `{nodes, edges}`，Word 节点带实时记忆度和 `weight`（度中心性，供前端同心圆排布）；指定 `category` 时只返回该分类子图。
-- `GET /api/categories` — 返回所有分类及统计 `{categories: [{name, description, word_count, sentence_count}]}`（笔记列表用）。
-- `POST /api/candidate-words` — body `{category, n}`：让 LLM 生成候选种子单词（只调 LLM、不写库），返回 `{words}`，供半自动勾选。
-- `GET /api/seeds?category=&intensity=&k=&focus=` — 预览按收敛强度选出的种子（**只读图、不调 LLM、不写库**），返回 `{words: [{text, weight, weight_norm, distance}], intensity, focus, cold_start}`，供图页面滑块即时反馈。带 `focus` 时返回的是**陪衬词**（焦点词自身已从取样中排除，由前端展示）。
-- `POST /api/automake` — body `{category, seeds, n_sentences, description, intensity, n_seeds, focus_word}`：执行一轮 autoMake 并写库。三种模式：**`seeds` 非空 = 用勾选的种子**（首页新建笔记）；**`seeds` 为空 = 按 `intensity` 自动选种子**（图页面右上角「+」，图空则 LLM 冷启动）；**再带 `focus_word` = 焦点词模式**（图页面单词上的「+」）。返回 `{ok, auto_seeds, intensity, focus_word, category, seeds, sentences, new_words}`。
-- `GET /api/rank?limit=N` — 返回推送复习顺序（见上）。
-- `POST /api/review` — body `{"word": "..."}`：复习成功后重置该词记忆度，返回 `{ok, word, memory_strength, next}`（`next` 是下一个待复习词，即 rank 第一位）。
+- `GET /api/categories` — 返回当前用户的所有分类及统计。
+- `POST /api/candidate-words` — body `{category, n}`：让 LLM 生成候选种子单词（使用用户配置的 LLM 或全局配置）。
+- `GET /api/seeds?category=&intensity=&k=&focus=` — 预览按收敛强度选出的种子（**只读图、不调 LLM、不写库**）。
+- `POST /api/automake` — body `{category, seeds, n_sentences, description, intensity, n_seeds, focus_word}`：执行一轮 autoMake 并写库。
+- `GET /api/rank?limit=N` — 返回推送复习顺序。
+- `POST /api/review` — body `{"word": "..."}`：复习成功后重置该词记忆度。
 - `GET /api/health` — 健康检查。
+
+### 认证接口（`app/api/auth_routes.py`）
+
+- `POST /api/auth/register` — body `{username, password}`：注册新用户，返回 `{access_token, user}`。
+- `POST /api/auth/login` — body `{username, password}`：登录，返回 `{access_token, user}`。
+- `GET /api/auth/me` — 获取当前用户信息。
+
+### 用户接口（`app/api/user_routes.py`）
+
+- `GET /api/user/profile` — 获取用户个人信息（包括 LLM 配置）。
+- `PUT /api/user/profile` — body `{llm_api_base, llm_api_key, llm_model}`：更新用户 LLM 配置，留空使用全局配置。
+
+### 管理员接口（`app/api/admin_routes.py`）
+
+- `GET /api/admin/users` — 获取用户列表（仅管理员）。
+- `DELETE /api/admin/users/{id}` — 删除用户（仅管理员）。
 
 ### 前端（`app/static/`）
 
-两个单文件页面，均复用同一套暗色设计变量，用 Cytoscape.js（本地 `/static/cytoscape.min.js`，已下载进仓库）渲染力导向图：
+四个单文件页面，均复用同一套暗色设计变量，用 Cytoscape.js 渲染力导向图。**所有页面都有登录检查**，未登录跳转 `/login`。
 
 **职责划分：首页只管「从零建一张图」（冷启动），图页面才管「让图继续长」（增词）。**
 
-- **`notes.html`（首页 `/`）** — 笔记列表 + 新建笔记（冷启动，无滑块）。输入分类 → 「生成候选单词」调 `POST /api/candidate-words` 渲染勾选列表（半自动）→ 勾选后「生成图」调 `POST /api/automake`（带 `seeds`）→ 刷新笔记列表（`GET /api/categories`，一个分类一条）。点击笔记跳转 `/graph?category=...`。
-- **`index.html`（图视图 `/graph`）** — 读取 `?category=` 参数只显示该分类子图（无参数则整图）。交互：
+- **`login.html`（登录注册 `/login`）** — 登录/注册表单，成功后保存 token 到 localStorage 并跳转首页。
+- **`profile.html`（个人信息 `/profile`）** — 显示用户信息，配置 LLM API（api_base/api_key/model），配置保存到 MySQL。
+- **`notes.html`（首页 `/`）** — 笔记列表 + 新建笔记。右上角「个人信息」跳转 `/profile`。输入分类 → 「生成候选单词」→ 勾选 → 「生成图」→ 刷新笔记列表。点击笔记跳转 `/graph?category=...`。
+- **`index.html`（图视图 `/graph`）** — 读取 `?category=` 参数只显示该分类子图。交互：
   - **节点亮度 = 记忆度**：Word 节点用单一蓝色从暗（记忆度低）到亮（记忆度高），Category 橙色、Sentence 灰色。
   - **点击单词节点 → 中文释义填空英文**：面板跟随节点移动（绑定 `pan zoom`），填对或「显示正确答案」都调 `POST /api/review` 更新记忆度、节点变亮，并自动跳到 rank 返回的下一个待复习词。
   - **点击例句节点 → 弹窗**：显示英文例句 + 中文翻译 + 句内实词的「词性/中文释义/英文释义」，句中单词可点击跳转到对应 Word 节点；Esc 退出弹窗。
@@ -147,10 +174,12 @@ python -m pytest -k <name>                    # 单个用例
 
 ## Neo4j 数据模型（`app/models/graph.py`）
 
+**数据隔离**：所有节点都带 `user_id` 属性，所有查询都按 `user_id` 过滤。
+
 **节点：**
-- `(:Category {name, description})` — 分类，可多个，`name` 唯一
-- `(:Word {text, pos, definition_cn, definition_en, frequency, memory_strength, last_reviewed_at})` — 英文单词，`text` 唯一，`definition_cn` 中文释义、`definition_en` 英文定义、`frequency` 出现次数、`memory_strength` 记忆度（0~1，实时计算）、`last_reviewed_at` 上次复习时间（艾宾浩斯衰减锚点）
-- `(:Sentence {text, translation, created_at})` — 例句，`translation` 中文翻译
+- `(:Category {name, description, user_id})` — 分类，`(name, user_id)` 组合唯一
+- `(:Word {text, pos, definition_cn, definition_en, frequency, memory_strength, last_reviewed_at, user_id})` — 英文单词，`(text, user_id)` 组合唯一
+- `(:Sentence {text, translation, created_at, user_id})` — 例句
 
 **边：**
 - `(Word)-[:BELONGS_TO]->(Category)`
@@ -158,7 +187,7 @@ python -m pytest -k <name>                    # 单个用例
 - `(Sentence)-[:CONTAINS]->(Word)`（建边时递增 `Word.frequency`）
 - `(Word)-[:SHARES_PREFIX {affix}]->(Word)` / `(Word)-[:SHARES_SUFFIX {affix}]->(Word)`
 
-**约束**：`Word.text`、`Category.name` 唯一，由 `db.py:init_constraints()` 幂等创建。
+**约束**：`(text, user_id)` 和 `(name, user_id)` 组合唯一，由 `db.py:init_constraints()` 幂等创建。同一用户的同一分类下不能有重复名称，但不同用户可以有同名分类。
 
 ## 配置
 

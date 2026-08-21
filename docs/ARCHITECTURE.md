@@ -8,10 +8,12 @@
 
 ## 1. 一句话架构
 
-一个 **FastAPI 单体服务** + **Neo4j 图数据库** + **外部 LLM（OpenAI 兼容接口）**，
-前端是两个不依赖构建工具的单文件 HTML，用 Cytoscape.js 画图。
+一个 **FastAPI 单体服务** + **Neo4j 图数据库** + **MySQL 用户数据库** + **外部 LLM（OpenAI 兼容接口）**，
+前端是几个不依赖构建工具的单文件 HTML，用 Cytoscape.js 画图。
 
-没有消息队列、没有缓存层、没有微服务。所有"智能"来自 LLM，所有"结构"来自 Neo4j。
+支持**多用户登录**，每个用户的图数据完全隔离。用户可以配置自己的 LLM API。
+
+没有消息队列、没有缓存层、没有微服务。所有"智能"来自 LLM，所有"结构"来自 Neo4j，用户信息存在 MySQL。
 
 ---
 
@@ -22,12 +24,16 @@ flowchart TB
     subgraph L1["接入层 · 用户入口"]
         A1["notes.html<br/>笔记列表页 /"]
         A2["index.html<br/>图视图 /graph"]
-        A3["app/cli.py<br/>终端交互"]
+        A3["login.html<br/>登录注册 /login"]
+        A4["profile.html<br/>个人信息 /profile"]
+        A5["app/cli.py<br/>终端交互"]
     end
 
-    subgraph L2["Web 层 · app/main.py + app/api/routes.py"]
-        B1["静态托管<br/>/ , /graph , /static/*"]
-        B2["REST 路由<br/>/api/*"]
+    subgraph L2["Web 层 · app/main.py + app/api/"]
+        B1["静态托管<br/>/ , /graph , /login , /profile"]
+        B2["REST 路由<br/>/api/* · 需要 JWT 认证"]
+        B3["认证路由<br/>/api/auth/*"]
+        B4["用户路由<br/>/api/user/*"]
     end
 
     subgraph L3["服务层 · app/services/"]
@@ -35,37 +41,47 @@ flowchart TB
         C2["weight.py<br/>权重 · 种子选择 · 排序"]
         C3["memory.py<br/>艾宾浩斯记忆度"]
         C4["graph_query.py<br/>图导出"]
-        C5["llm.py<br/>LLM 客户端"]
-        C6["review.py / rumination.py<br/>预留"]
+        C5["llm.py<br/>LLM 客户端 · 支持用户配置"]
+        C6["auth.py<br/>JWT 认证 · 密码哈希"]
+        C7["review.py / rumination.py<br/>预留"]
     end
 
     subgraph L4["数据访问层"]
         D1["app/db.py<br/>GraphDB.run 唯一写库入口"]
-        D2["app/models/graph.py<br/>全部 Cypher 常量"]
+        D2["app/models/graph.py<br/>全部 Cypher 常量 · 带 user_id"]
         D3["app/models/schemas.py<br/>WordInfo / SentenceInfo"]
+        D4["app/models/user.py<br/>User 模型 · SQLAlchemy"]
     end
 
     subgraph L5["外部依赖"]
-        E1[("Neo4j<br/>bolt://localhost:7687")]
-        E2["LLM API<br/>OpenAI 兼容"]
+        E1[("Neo4j<br/>bolt://localhost:7687<br/>图数据 · 按 user_id 隔离")]
+        E2[("MySQL<br/>localhost:3306<br/>用户信息 · LLM 配置")]
+        E3["LLM API<br/>OpenAI 兼容 · 可按用户配置"]
     end
 
     subgraph L6["配置 · app/config.py"]
-        F1["config/llm.yaml<br/>含密钥 · gitignore"]
+        F1["config/llm.yaml<br/>全局 LLM 配置 · gitignore"]
         F2["config/affixes.yaml<br/>词缀清单"]
     end
 
     A1 --> B1
     A2 --> B1
+    A3 --> B1
+    A4 --> B1
     A1 --> B2
     A2 --> B2
-    A3 --> C1
+    A3 --> B3
+    A4 --> B4
+    A5 --> C1
 
     B2 --> C1
     B2 --> C2
     B2 --> C3
     B2 --> C4
     B2 --> C5
+    B2 -->|"JWT 认证"| C6
+    B3 --> C6
+    B4 --> C6
 
     C1 --> C2
     C1 --> C5
@@ -74,10 +90,12 @@ flowchart TB
     C3 --> D1
     C4 --> D1
     C4 --> C3
+    C6 --> D4
 
     D1 --> D2
     D1 --> E1
-    C5 --> E2
+    C6 --> E2
+    C5 --> E3
 
     F1 --> C5
     F2 --> C1
@@ -141,19 +159,23 @@ flowchart LR
 
 | 文件 | 职责 | 说明 |
 |---|---|---|
-| `app/main.py` | FastAPI 应用装配 | 挂 `/api` 路由、`/static` 静态目录；`/` 返回 `notes.html`，`/graph` 返回 `index.html`（用 `FileResponse`，每次请求重读磁盘，所以改 HTML 不用重启，改 Python 要重启） |
-| `app/api/routes.py` | REST 接口 + 请求模型 | 8 个端点；每个端点自己开关 `GraphDB` 连接（`try/finally`），无连接池 |
+| `app/main.py` | FastAPI 应用装配 | 挂 `/api` 路由、`/static` 静态目录；`/` 返回 `notes.html`，`/graph` 返回 `index.html`，`/login` 返回 `login.html`，`/profile` 返回 `profile.html` |
+| `app/api/routes.py` | REST 接口 + 请求模型 | 8 个端点，**都需要 JWT 认证**；每个端点自己开关 `GraphDB` 连接，无连接池 |
+| `app/api/auth_routes.py` | 认证接口 | `/api/auth/register`、`/api/auth/login`、`/api/auth/me` |
+| `app/api/user_routes.py` | 用户信息接口 | `GET/PUT /api/user/profile`，管理用户 LLM 配置 |
+| `app/api/admin_routes.py` | 管理员接口 | `GET /api/admin/users`、`DELETE /api/admin/users/{id}` |
 | `app/cli.py` | 终端交互入口 | `python -m app.cli`，走完整 autoMake 一轮，用于不开浏览器快速验证 |
 
 ### 4.2 服务层
 
 | 模块 | 职责 | 关键设计 |
 |---|---|---|
-| `automake.py` | **自生长引擎**。编排"种子 → 例句 → 新词入图 → 词缀边" | 词形还原交给 LLM（`asserting → assert`），避免屈折形式拆成多个节点；`pick_seeds()` 三分支选种子 |
-| `weight.py` | 单词重要度 + 种子采样 + 复习排序 | 基于六度空间理论：关联节点越多越核心。v1 用**度中心性**，**实时算不落库**，后续可升级 GDS PageRank |
-| `memory.py` | 艾宾浩斯遗忘曲线 | `memory_strength = e^(-Δt / half_life)`，`half_life` 默认 7 天；入图时 `0.0`，复习后置 `1.0` |
-| `graph_query.py` | 图结构导出给前端 | 输出 `{nodes, edges}`；Word 带实时记忆度 + 权重，Sentence 记忆度 = 所含词均值 |
-| `llm.py` | LLM 客户端 | `generate_top_words` / `generate_definitions` / `generate_sentences`，返回 Pydantic 结构化对象 |
+| `automake.py` | **自生长引擎**。编排"种子 → 例句 → 新词入图 → 词缀边" | 词形还原交给 LLM（`asserting → assert`），避免屈折形式拆成多个节点；`pick_seeds()` 三分支选种子；**所有操作带 user_id** |
+| `weight.py` | 单词重要度 + 种子采样 + 复习排序 | 基于六度空间理论：关联节点越多越核心。v1 用**度中心性**，**实时算不落库**；**按 user_id 隔离** |
+| `memory.py` | 艾宾浩斯遗忘曲线 | `memory_strength = e^(-Δt / half_life)`，`half_life` 默认 7 天；入图时 `0.0`，复习后置 `1.0`；**按 user_id 隔离** |
+| `graph_query.py` | 图结构导出给前端 | 输出 `{nodes, edges}`；Word 带实时记忆度 + 权重；**按 user_id 过滤** |
+| `llm.py` | LLM 客户端 | `generate_top_words` / `generate_definitions` / `generate_sentences`；**支持用户自定义 API 配置覆盖全局配置** |
+| `auth.py` | JWT 认证 | 密码哈希（pbkdf2_sha256）、JWT token 生成/验证、FastAPI 依赖注入 `get_current_user` |
 | `review.py` | 关联审查 | **预留**，审查例句质量 / 新词是否该入图 |
 | `rumination.py` | 反刍 | **预留**，对生成结果二次修改，与艾宾浩斯复习无关 |
 
@@ -180,22 +202,25 @@ flowchart LR
 ```mermaid
 erDiagram
     Category {
-        string name PK "唯一约束"
+        string name "组合唯一约束 (name, user_id)"
         string description
+        int user_id "用户 ID · 数据隔离"
     }
     Word {
-        string text PK "唯一约束 · 小写原形"
+        string text "组合唯一约束 (text, user_id)"
         string pos "词性"
         string definition_cn "中文释义"
         string definition_en "英文定义"
         int frequency "出现次数"
         float memory_strength "记忆度 0~1"
         string last_reviewed_at "上次复习 ISO 时间"
+        int user_id "用户 ID · 数据隔离"
     }
     Sentence {
-        string text PK
+        string text
         string translation "中文翻译"
         string created_at
+        int user_id "用户 ID · 数据隔离"
     }
 
     Word ||--o{ Category : "BELONGS_TO"
@@ -204,6 +229,10 @@ erDiagram
     Word ||--o{ Word : "SHARES_PREFIX affix"
     Word ||--o{ Word : "SHARES_SUFFIX affix"
 ```
+
+**数据隔离**：所有节点都带 `user_id` 属性，所有查询都按 `user_id` 过滤。不同用户的图完全独立。
+
+**唯一约束**：`(text, user_id)` 和 `(name, user_id)` 组合唯一——同一用户可以有相同名称的节点在不同分类中，但同一分类下不能重复。
 
 ### 两张互相促进的图
 
@@ -230,7 +259,10 @@ flowchart LR
 
 ### 约束与索引
 
-`db.py:init_constraints()` 幂等创建：`Word.text` 唯一、`Category.name` 唯一。
+`db.py:init_constraints()` 幂等创建：
+- `Word` 的 `(text, user_id)` 组合唯一
+- `Category` 的 `(name, user_id)` 组合唯一
+
 每次 `POST /api/automake` 都会先调一次，所以不需要单独的迁移步骤。
 
 ### 已知局限
@@ -246,17 +278,31 @@ flowchart LR
 
 ## 6. 前端架构
 
-两个**单文件 HTML**（内联 CSS + 内联 JS），无构建步骤，共用同一套暗色设计变量。
+**四个单文件 HTML**（内联 CSS + 内联 JS），无构建步骤，共用同一套暗色设计变量。
 Cytoscape.js 从 `/static/cytoscape.min.js` 本地加载（已下载进仓库，不依赖 CDN）。
+
+所有页面都有**登录检查**，未登录跳转 `/login`。所有 API 请求都带 `Authorization: Bearer <token>`。
 
 ```mermaid
 flowchart TB
+    subgraph L["login.html · 登录注册 /login"]
+        L1["登录/注册表单"] --> L2["POST /api/auth/login 或 /register"]
+        L2 --> L3["保存 token 到 localStorage"]
+        L3 --> L4["跳转 /"]
+    end
+
     subgraph N["notes.html · 首页 /"]
         N1["输入分类名"] --> N2["生成候选单词<br/>POST /api/candidate-words"]
         N2 --> N3["勾选种子"]
         N3 --> N4["生成图<br/>POST /api/automake"]
         N4 --> N5["刷新笔记列表<br/>GET /api/categories"]
         N5 --> N6["点笔记 → /graph?category=..."]
+        N7["右上角 个人信息 → /profile"]
+    end
+
+    subgraph P["profile.html · 个人信息 /profile"]
+        P1["显示用户信息"]
+        P2["配置 LLM API"] --> P3["PUT /api/user/profile"]
     end
 
     subgraph I["index.html · 图视图 /graph"]
@@ -275,7 +321,9 @@ flowchart TB
         I3 --> I4
     end
 
+    L4 --> N1
     N6 --> I1
+    N7 --> P1
 ```
 
 ### 视觉编码约定
@@ -307,21 +355,28 @@ graph_memory/
 │   ├── config.py            # yaml 配置加载
 │   ├── db.py                # GraphDB · 唯一写库入口
 │   ├── api/
-│   │   └── routes.py        # 全部 REST 端点
+│   │   ├── routes.py        # REST 端点（需要认证）
+│   │   ├── auth_routes.py   # 认证接口
+│   │   ├── user_routes.py   # 用户信息接口
+│   │   └── admin_routes.py  # 管理员接口
 │   ├── models/
-│   │   ├── graph.py         # 全部 Cypher 常量
-│   │   └── schemas.py       # WordInfo / SentenceInfo
+│   │   ├── graph.py         # 全部 Cypher 常量（带 user_id）
+│   │   ├── schemas.py       # WordInfo / SentenceInfo
+│   │   └── user.py          # User 模型（SQLAlchemy）
 │   ├── services/
 │   │   ├── automake.py      # 自生长引擎
 │   │   ├── weight.py        # 权重 / 种子采样 / 排序
 │   │   ├── memory.py        # 艾宾浩斯
 │   │   ├── graph_query.py   # 图导出
-│   │   ├── llm.py           # LLM 客户端
+│   │   ├── llm.py           # LLM 客户端（支持用户配置）
+│   │   ├── auth.py          # JWT 认证 · 密码哈希
 │   │   ├── review.py        # 预留
 │   │   └── rumination.py    # 预留
 │   └── static/
 │       ├── notes.html       # 首页
 │       ├── index.html       # 图视图
+│       ├── login.html       # 登录/注册页
+│       ├── profile.html     # 个人信息页
 │       └── cytoscape.min.js
 ├── config/
 │   ├── llm.example.yaml     # 模板（已跟踪）
@@ -329,7 +384,8 @@ graph_memory/
 │   └── affixes.yaml         # 词缀清单
 ├── tests/                   # pytest，不依赖真实 Neo4j / LLM
 ├── docs/                    # 本文档目录
-├── docker-compose.yml       # Neo4j
+├── docker-compose.yml       # Neo4j + MySQL
+├── requirements.txt         # Python 依赖
 └── CLAUDE.md
 ```
 

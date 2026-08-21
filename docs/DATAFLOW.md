@@ -12,24 +12,39 @@ flowchart LR
     U(("用户"))
 
     subgraph FE["前端"]
+        LH["login.html"]
         NH["notes.html"]
         IH["index.html"]
+        PH["profile.html"]
     end
 
     subgraph BE["FastAPI 服务"]
+        AR["auth_routes"]
+        UR["user_routes"]
         R["routes.py"]
         AM["automake"]
         WT["weight"]
         MEM["memory"]
         GQ["graph_query"]
         LC["llm client"]
+        AUTH["auth"]
     end
 
     LLM["LLM API"]
-    NEO[("Neo4j")]
+    NEO[("Neo4j<br/>按 user_id 隔离")]
+    MY[("MySQL<br/>用户信息")]
 
+    U -->|"登录/注册"| LH
     U -->|"分类名 / 勾选 / 强度 / 答题"| FE
-    FE -->|"HTTP JSON"| R
+    U -->|"配置 LLM"| PH
+    FE -->|"HTTP JSON + JWT"| R
+    LH -->|"POST /api/auth/*"| AR
+    PH -->|"PUT /api/user/profile"| UR
+
+    AR --> AUTH
+    UR --> AUTH
+    R -->|"JWT 验证"| AUTH
+    AUTH --> MY
 
     R --> AM
     R --> WT
@@ -37,14 +52,15 @@ flowchart LR
     R --> GQ
 
     AM -->|"种子词 + 分类 + 条数"| LC
-    LC -->|"prompt"| LLM
+    LC -->|"用户配置 or 全局配置"| LLM
     LLM -->|"例句 + 翻译 + 实词释义"| LC
     LC -->|"SentenceInfo 列表"| AM
 
-    AM -->|"Cypher 写"| NEO
-    WT -->|"Cypher 读 · 度中心性"| NEO
-    MEM -->|"Cypher 读写 · 记忆度"| NEO
-    GQ -->|"Cypher 读 · 全图"| NEO
+    AM -->|"Cypher 写 · 带 user_id"| NEO
+    WT -->|"Cypher 读 · 带 user_id"| NEO
+    MEM -->|"Cypher 读写 · 带 user_id"| NEO
+    GQ -->|"Cypher 读 · 带 user_id"| NEO
+    UR -->|"读写用户配置"| MY
 
     GQ -->|"nodes + edges"| R
     WT -->|"排序后的词表"| R
@@ -52,15 +68,86 @@ flowchart LR
     FE -->|"Cytoscape 渲染"| U
 
     style NEO fill:#2d3748,color:#fff
+    style MY fill:#3d2817,color:#fff
     style LLM fill:#4a3728,color:#fff
 ```
 
-**三种外部数据源**：用户输入（分类、勾选、强度、答题）、LLM 产出（例句和释义）、Neo4j 存量（已有的词和边）。
+**四种外部数据源**：用户输入（分类、勾选、强度、答题）、LLM 产出（例句和释义）、Neo4j 存量（按 user_id 隔离的图数据）、MySQL 用户数据。
 **唯一的真相来源是 Neo4j**——记忆度、权重都是从图里**实时算出来的**，不缓存、不落中间态。
+**用户配置可覆盖全局 LLM 配置**——每个用户可以有自己的 API key 和模型。
 
 ---
 
-## 2. 写路径：autoMake 一轮的数据流
+## 2. 认证数据流
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant LH as login.html
+    participant AR as auth_routes
+    participant AUTH as auth.py
+    participant MY as MySQL
+
+    U->>LH: 填写用户名/密码
+    LH->>AR: POST /api/auth/login
+    AR->>AUTH: verify_password()
+    AUTH->>MY: 查询 User
+    MY-->>AUTH: User 记录
+    AUTH-->>AR: 验证通过
+    AR->>AUTH: create_access_token(user.id)
+    AUTH-->>AR: JWT token
+    AR-->>LH: {access_token, user}
+    LH->>LH: localStorage.setItem("token")
+    LH->>U: 跳转首页
+
+    Note over LH,MY: 后续请求
+    U->>LH: 操作
+    LH->>AR: HTTP + Authorization: Bearer <token>
+    AR->>AUTH: get_current_user(token)
+    AUTH-->>AR: User 对象
+    AR-->>LH: 响应（带 user_id 的数据）
+```
+
+**关键点**：
+- 登录成功返回 JWT token，有效期 24 小时
+- 前端保存 token 到 `localStorage`
+- 后续所有请求都带 `Authorization: Bearer <token>`
+- 后端 `get_current_user()` 依赖注入解析 token，获取 `user.id`
+- 所有数据库操作都传 `user_id`，实现数据隔离
+
+---
+
+## 3. 用户 LLM 配置数据流
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant PH as profile.html
+    participant UR as user_routes
+    participant MY as MySQL
+    participant LC as LLMClient
+
+    U->>PH: 填写 API 配置
+    PH->>UR: PUT /api/user/profile
+    UR->>MY: UPDATE users SET llm_api_base, llm_api_key, llm_model
+    MY-->>UR: OK
+    UR-->>PH: {ok, user}
+    PH->>U: 配置已保存
+
+    Note over U,LC: 生成单词时
+    U->>PH: 点击生成
+    PH->>UR: POST /api/automake + JWT
+    UR->>MY: 查询 User.llm_api_*
+    UR->>LC: LLMClient(user_llm_config={...})
+    LC->>LC: 用户配置覆盖全局配置
+    LC-->>UR: 生成结果
+```
+
+**配置优先级**：用户配置 > 全局配置（`config/llm.yaml`）
+
+---
+
+## 4. 写路径：autoMake 一轮的数据流
 
 这是系统里唯一会写库的路径。数据形态在每一步都发生变化：
 
@@ -122,9 +209,9 @@ LLM 返回的 `words[]` **已经是原形**（`asserting → assert`），不再
 
 ---
 
-## 3. 读路径
+## 5. 读路径
 
-### 3.1 `GET /api/graph` —— 前端渲染的数据来源
+### 5.1 `GET /api/graph` —— 前端渲染的数据来源
 
 ```mermaid
 flowchart LR
@@ -154,7 +241,7 @@ flowchart LR
 和"系统推荐先复习的词"会对不上，用户会觉得系统在自相矛盾。
 （前端仍保留 `node.degree()` 作为 `weight` 缺失时的兜底。）
 
-### 3.2 `GET /api/rank` —— 推送复习顺序
+### 5.2 `GET /api/rank` —— 推送复习顺序
 
 ```mermaid
 flowchart LR
@@ -168,7 +255,7 @@ flowchart LR
 含义直白：**又重要、又快忘光了** 的词排最前。
 从没复习过的词 `memory_strength = 0`，所以 `score = weight_norm`——高频核心词天然排在最前面。
 
-### 3.3 `POST /api/review` —— 复习回写
+### 5.3 `POST /api/review` —— 复习回写
 
 这是除 autoMake 外**唯一会写库**的路径，但只改 Word 节点的两个属性：
 
@@ -197,7 +284,7 @@ sequenceDiagram
 
 一次请求同时完成"记这次复习"和"给下一题"，前端不用再发一次 `/api/rank`。
 
-### 3.4 `GET /api/seeds` —— 滑块的即时预览
+### 5.4 `GET /api/seeds` —— 滑块的即时预览
 
 ```mermaid
 flowchart LR
@@ -215,7 +302,7 @@ flowchart LR
 
 ---
 
-## 4. 自生长闭环
+## 6. 自生长闭环
 
 这是整个项目的核心机制。**闭环不需要任何人工回灌**：
 
@@ -263,7 +350,7 @@ flowchart TB
 
 ---
 
-## 5. 两个"+"的数据流对比
+## 7. 两个"+"的数据流对比
 
 图页面上有两个增词入口，走同一个 `POST /api/automake`，区别只在 `focus_word`：
 
@@ -303,7 +390,7 @@ flowchart TB
 
 ---
 
-## 6. 数据一致性约定
+## 8. 数据一致性约定
 
 | 约定 | 原因 |
 |---|---|
@@ -312,3 +399,5 @@ flowchart TB
 | 所有 Cypher 集中在 `models/graph.py` | 前端布局和后端排序必须用同一个 `ALL_WORD_DEGREES`，共用常量才能保证口径一致 |
 | 所有写库经 `GraphDB.run()` | 单一入口，便于日后加事务、重试、审计 |
 | 单词一律 `strip().lower()` 后入图 | `Word.text` 是唯一约束，大小写不统一会造出重复节点 |
+| **所有节点带 `user_id`，所有查询按 `user_id` 过滤** | 多用户数据隔离，不同用户的图完全独立 |
+| 用户 LLM 配置存在 MySQL `users` 表 | 用户可配置自己的 API key/模型，覆盖全局配置 |

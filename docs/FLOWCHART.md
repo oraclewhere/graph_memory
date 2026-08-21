@@ -5,7 +5,48 @@
 
 ---
 
-## 1. autoMake 一轮完整流程
+## 1. 登录/注册流程
+
+```mermaid
+flowchart TB
+    A(["访问任何页面"]) --> B{"localStorage<br/>有 token？"}
+    B -->|"没有"| C["跳转 /login"]
+    B -->|"有"| D["正常访问"]
+
+    C --> E{"选择操作"}
+    E -->|"注册"| F["填写用户名/密码"]
+    E -->|"登录"| G["填写用户名/密码"]
+
+    F --> H["POST /api/auth/register"]
+    G --> I["POST /api/auth/login"]
+
+    H --> J{"注册成功？"}
+    I --> K{"登录成功？"}
+
+    J -->|"是"| L["返回 token + user"]
+    J -->|"否 · 用户名已存在"| M["提示错误"]
+    M --> F
+
+    K -->|"是"| L
+    K -->|"否 · 密码错误"| N["提示错误"]
+    N --> G
+
+    L --> O["localStorage.setItem(token)"]
+    O --> P["跳转 /"]
+    P --> D
+
+    style C fill:#4a3728,color:#fff
+    style L fill:#1e3a2f,color:#fff
+```
+
+**关键点**：
+- 所有页面都有登录检查，未登录跳转 `/login`
+- 登录成功返回 JWT token，有效期 24 小时
+- token 存储在 `localStorage`，后续请求自动带上
+
+---
+
+## 2. autoMake 一轮完整流程
 
 ```mermaid
 flowchart TB
@@ -60,7 +101,7 @@ flowchart TB
 
 ---
 
-## 2. 种子选择决策树
+## 3. 种子选择决策树
 
 `pick_seeds()` 只有三条出路，判断顺序不能换：
 
@@ -106,7 +147,7 @@ return scored[:max(0, k)]
 
 ---
 
-## 3. 收敛强度采样
+## 4. 收敛强度采样
 
 ```mermaid
 flowchart TB
@@ -148,7 +189,7 @@ weight_norm:  0.0 ────────────────────�
 
 ---
 
-## 4. 词缀边构建
+## 5. 词缀边构建
 
 ```mermaid
 flowchart TB
@@ -180,9 +221,9 @@ flowchart TB
 
 ---
 
-## 5. 记忆度与复习循环
+## 6. 记忆度与复习循环
 
-### 5.1 一个单词的记忆度生命周期
+### 6.1 一个单词的记忆度生命周期
 
 ```mermaid
 stateDiagram-v2
@@ -203,7 +244,7 @@ stateDiagram-v2
     end note
 ```
 
-### 5.2 前端复习循环
+### 6.2 前端复习循环
 
 ```mermaid
 flowchart TB
@@ -231,7 +272,7 @@ flowchart TB
 
 ---
 
-## 6. 前端首页流程（冷启动建图）
+## 7. 前端首页流程（冷启动建图）
 
 ```mermaid
 flowchart TB
@@ -262,7 +303,7 @@ flowchart TB
 
 ---
 
-## 7. 图页面增词弹窗流程
+## 8. 图页面增词弹窗流程
 
 两个「+」共用同一个弹窗，区别只在带不带 `focus_word`：
 
@@ -307,7 +348,7 @@ flowchart TB
 
 ---
 
-## 8. 搜索框流程
+## 9. 搜索框流程
 
 ```mermaid
 flowchart TB
@@ -333,7 +374,7 @@ flowchart TB
 
 ---
 
-## 9. 布局切换流程
+## 10. 布局切换流程
 
 ```mermaid
 flowchart TB
@@ -364,7 +405,7 @@ flowchart TB
 
 ---
 
-## 10. 测试流程
+## 11. 测试流程
 
 ```mermaid
 flowchart LR
