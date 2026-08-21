@@ -20,17 +20,43 @@ from app.models.schemas import SentenceInfo, WordInfo
 class LLMClient:
     """封装 LLM 调用，返回结构化结果。"""
 
-    def __init__(self, config: LLMConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: LLMConfig | None = None,
+        user_llm_config: dict | None = None,
+    ) -> None:
+        """初始化 LLM 客户端。
+
+        Args:
+            config: 全局 LLM 配置（从 yaml 加载）
+            user_llm_config: 用户自定义配置 {"api_base", "api_key", "model"}
+                            如果提供且字段非空，会覆盖全局配置
+        """
         self.config = config or load_llm_config()
+
+        # 用户配置覆盖全局配置
+        api_base = self.config.api_base
+        api_key = self.config.api_key
+        model = self.config.model
+
+        if user_llm_config:
+            if user_llm_config.get("api_base"):
+                api_base = user_llm_config["api_base"]
+            if user_llm_config.get("api_key"):
+                api_key = user_llm_config["api_key"]
+            if user_llm_config.get("model"):
+                model = user_llm_config["model"]
+
+        self.model = model
         self._client = OpenAI(
-            base_url=self.config.api_base,
-            api_key=self.config.api_key,
+            base_url=api_base,
+            api_key=api_key,
             timeout=self.config.timeout,
         )
 
     def _chat(self, system: str, user: str) -> str:
         resp = self._client.chat.completions.create(
-            model=self.config.model,
+            model=self.model,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},

@@ -79,13 +79,24 @@ def categories(user: User = Depends(get_current_user)) -> dict:
         gdb.close()
 
 
+def _get_user_llm_config(user: User) -> dict | None:
+    """获取用户的 LLM 配置（如果有配置则返回 dict，否则返回 None）。"""
+    if user.llm_api_key or user.llm_api_base or user.llm_model:
+        return {
+            "api_base": user.llm_api_base or "",
+            "api_key": user.llm_api_key or "",
+            "model": user.llm_model or "",
+        }
+    return None
+
+
 @router.post("/candidate-words")
 def candidate_words(
     req: CandidateRequest,
     user: User = Depends(get_current_user),
 ) -> dict:
     """让 LLM 生成该分类的候选种子单词（只调 LLM、不写库，供半自动勾选）。"""
-    llm = LLMClient()
+    llm = LLMClient(user_llm_config=_get_user_llm_config(user))
     words = llm.generate_top_words(req.category, req.n)
     return {"words": [w.model_dump() for w in words]}
 
@@ -141,7 +152,7 @@ def automake(
     try:
         gdb.init_constraints()
         affixes = load_affix_config()
-        llm = LLMClient()
+        llm = LLMClient(user_llm_config=_get_user_llm_config(user))
         am = AutoMake(gdb, llm, affixes, user_id=user.id)
         auto = not req.seeds
         seed_list = (

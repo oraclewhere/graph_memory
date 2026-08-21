@@ -19,10 +19,18 @@ class User(Base):
     role = Column(Enum("user", "admin", name="user_role"), default="user", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    # 用户自定义 LLM 配置（可选，为空时使用全局配置）
+    llm_api_base = Column(String(500), nullable=True)
+    llm_api_key = Column(String(500), nullable=True)
+    llm_model = Column(String(100), nullable=True)
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
             "username": self.username,
             "role": self.role,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "llm_api_base": self.llm_api_base or "",
+            "llm_api_key": self.llm_api_key or "",
+            "llm_model": self.llm_model or "",
         }

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>graph_memory · 个人信息</title>
+<style>
+  :root {
+    --surface: #1a1a19;
+    --panel: #232322;
+    --panel-border: #3a3a38;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-3: #898781;
+    --blue-bright: #cde2fb;
+    --blue-dim: #3987e5;
+    --orange: #eb6834;
+    --good: #0ca30c;
+    --critical: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+  }
+  header h1 { font-size: 22px; margin: 0; }
+  header .sub { font-size: 13px; color: var(--ink-3); margin: 4px 0 0; }
+
+  .back-link {
+    color: var(--blue-bright);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 8px 16px;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+  }
+  .back-link:hover { background: var(--panel); }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 22px;
+    margin-bottom: 24px;
+  }
+  .card h2 {
+    font-size: 15px;
+    margin: 0 0 16px;
+    color: var(--ink);
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .form-group {
+    margin-bottom: 18px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    color: var(--ink-2);
+    margin-bottom: 6px;
+  }
+  .form-group .hint {
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-top: 4px;
+  }
+  .form-group input {
+    width: 100%;
+    padding: 11px 13px;
+    font-size: 14px;
+    background: #141414;
+    color: var(--ink);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    outline: none;
+  }
+  .form-group input:focus {
+    border-color: var(--blue-bright);
+  }
+  .form-group input[readonly] {
+    background: #1a1a19;
+    color: var(--ink-3);
+    cursor: not-allowed;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  button.primary {
+    padding: 11px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--blue-dim);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button.primary:hover { background: #2f7ad4; }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  button.secondary {
+    padding: 11px 24px;
+    font-size: 14px;
+    background: transparent;
+    color: var(--ink-2);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button.secondary:hover { background: var(--panel); }
+
+  .status {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-top: 16px;
+    display: none;
+  }
+  .status.success {
+    display: block;
+    background: rgba(12, 163, 12, 0.15);
+    color: var(--good);
+    border: 1px solid var(--good);
+  }
+  .status.error {
+    display: block;
+    background: rgba(230, 103, 103, 0.15);
+    color: var(--critical);
+    border: 1px solid var(--critical);
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: #141414;
+    border-radius: 8px;
+    margin-bottom: 16px;
+  }
+  .user-info .avatar {
+    width: 48px;
+    height: 48px;
+    background: var(--blue-dim);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .user-info .info {
+    flex: 1;
+  }
+  .user-info .username {
+    font-size: 16px;
+    font-weight: 500;
+  }
+  .user-info .role {
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-top: 2px;
+  }
+  .user-info .role.admin {
+    color: var(--orange);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>个人信息</h1>
+      <p class="sub">管理账户设置和 LLM 配置</p>
+    </div>
+    <a href="/" class="back-link">← 返回首页</a>
+  </header>
+
+  <!-- 用户信息卡片 -->
+  <div class="card">
+    <h2>账户信息</h2>
+    <div class="user-info">
+      <div class="avatar" id="avatar"></div>
+      <div class="info">
+        <div class="username" id="username">-</div>
+        <div class="role" id="role">-</div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>用户名</label>
+      <input type="text" id="username-input" readonly>
+      <div class="hint">用户名创建后不可修改</div>
+    </div>
+    <div class="form-group">
+      <label>注册时间</label>
+      <input type="text" id="created-at" readonly>
+    </div>
+  </div>
+
+  <!-- LLM 配置卡片 -->
+  <div class="card">
+    <h2>LLM 配置</h2>
+    <p style="font-size: 13px; color: var(--ink-3); margin: -8px 0 20px;">
+      配置你自己的 LLM API，留空则使用系统默认配置
+    </p>
+
+    <div class="form-group">
+      <label>API Base URL</label>
+      <input type="text" id="llm-api-base" placeholder="https://api.openai.com/v1">
+      <div class="hint">OpenAI 兼容接口的 base URL，如：https://api.openai.com/v1</div>
+    </div>
+
+    <div class="form-group">
+      <label>API Key</label>
+      <input type="password" id="llm-api-key" placeholder="sk-...">
+      <div class="hint">你的 API 密钥，会安全存储</div>
+    </div>
+
+    <div class="form-group">
+      <label>Model Name</label>
+      <input type="text" id="llm-model" placeholder="gpt-4o-mini">
+      <div class="hint">模型名称，如：gpt-4o-mini, deepseek-chat, qwen-turbo</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="primary" id="btn-save" onclick="saveProfile()">保存配置</button>
+      <button class="secondary" onclick="loadProfile()">重新加载</button>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<script>
+// 检查登录状态
+const token = localStorage.getItem("token");
+if (!token) {
+  window.location.href = "/login";
+}
+
+// API 请求封装
+async function apiFetch(url, options = {}) {
+  const token = localStorage.getItem("token");
+  options.headers = {
+    ...options.headers,
+    "Authorization": `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+    return;
+  }
+  return res;
+}
+
+// 显示状态消息
+function showStatus(message, isError = false) {
+  const status = document.getElementById("status");
+  status.textContent = message;
+  status.className = "status " + (isError ? "error" : "success");
+  setTimeout(() => {
+    status.className = "status";
+  }, 3000);
+}
+
+// 加载用户信息
+async function loadProfile() {
+  try {
+    const res = await apiFetch("/api/user/profile");
+    if (!res.ok) throw new Error("加载失败");
+    const data = await res.json();
+    const user = data.user;
+
+    // 更新用户信息显示
+    document.getElementById("username").textContent = user.username;
+    document.getElementById("username-input").value = user.username;
+
+    const roleEl = document.getElementById("role");
+    roleEl.textContent = user.role === "admin" ? "管理员" : "普通用户";
+    roleEl.className = "role" + (user.role === "admin" ? " admin" : "");
+
+    // 头像
+    document.getElementById("avatar").textContent = user.username.charAt(0).toUpperCase();
+
+    // 注册时间
+    if (user.created_at) {
+      const date = new Date(user.created_at);
+      document.getElementById("created-at").value = date.toLocaleString("zh-CN");
+    }
+
+    // LLM 配置
+    document.getElementById("llm-api-base").value = user.llm_api_base || "";
+    document.getElementById("llm-api-key").value = user.llm_api_key || "";
+    document.getElementById("llm-model").value = user.llm_model || "";
+
+  } catch (err) {
+    showStatus("加载失败: " + err.message, true);
+  }
+}
+
+// 保存配置
+async function saveProfile() {
+  const btn = document.getElementById("btn-save");
+  btn.disabled = true;
+  btn.textContent = "保存中...";
+
+  try {
+    const data = {
+      llm_api_base: document.getElementById("llm-api-base").value.trim(),
+      llm_api_key: document.getElementById("llm-api-key").value.trim(),
+      llm_model: document.getElementById("llm-model").value.trim(),
+    };
+
+    const res = await apiFetch("/api/user/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) throw new Error("保存失败");
+    const result = await res.json();
+
+    showStatus("配置已保存");
+  } catch (err) {
+    showStatus("保存失败: " + err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "保存配置";
+  }
+}
+
+// 页面加载时获取用户信息
+loadProfile();
+</script>
+</body>
+</html>

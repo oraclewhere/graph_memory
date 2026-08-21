@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.admin_routes import router as admin_router
 from app.api.auth_routes import router as auth_router
 from app.api.routes import router
+from app.api.user_routes import router as user_router
 from app.services.auth import SessionLocal, create_initial_admin, init_db
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -18,6 +19,7 @@ app = FastAPI(title="graph_memory", version="0.3.0")
 app.include_router(router)
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(user_router)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
@@ -50,3 +52,8 @@ def graph_page() -> FileResponse:
 @app.get("/login")
 def login_page() -> FileResponse:
     return FileResponse(str(STATIC_DIR / "login.html"))
+
+
+@app.get("/profile")
+def profile_page() -> FileResponse:
+    return FileResponse(str(STATIC_DIR / "profile.html"))
