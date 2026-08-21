@@ -296,8 +296,8 @@ memory_strength = e^(-Δt / half_life)
 ```
 
 - `id` 格式：`word:<text>` / `sentence:<text>` / `category:<name>`。
-- Word 节点的 `properties.memory_strength` 为实时计算的记忆度。
-- Sentence 节点的 `properties.memory_strength` = 所含词记忆度均值；`properties.words` = 句内实词原形列表（例句弹窗点击跳转用）。
+- Word 节点的 `properties.memory_strength` 为实时计算的记忆度；`properties.weight` 为度中心性（与 `weight.py` 用同一个 `ALL_WORD_DEGREES` 查询，保证前端排布和推送排序口径一致）。
+- Sentence 节点的 `properties.memory_strength` = 所含词记忆度均值；`properties.weight` = 所含实词数；`properties.words` = 句内实词原形列表（例句弹窗点击跳转用）。
 - 指定 `category` 时用 `GET_CATEGORY_WORDS` / `GET_CATEGORY_SENTENCES` / `GET_CATEGORY_BY_NAME` 取该分类节点，并剔除两端不在子图内的边。
 
 **完整 API 清单**：
@@ -332,11 +332,18 @@ memory_strength = e^(-Δt / half_life)
 - **点击单词节点**：右侧浮出填空面板（显示「词性 / 中文释义 / 英文释义」），面板跟随节点移动（绑定 `pan zoom`），用户填英文提交。
 - **答对**：调 `POST /api/review` 重置记忆度 → 节点变亮 → 自动跳到 rank 返回的下一个待复习词；**答错**弹窗询问「显示正确答案 / 再试一次」。
 - **点击例句节点**：弹窗显示英文例句 + 中文翻译 + 句内实词（词性/中英释义），句中单词可点击跳转到对应 Word 节点；Esc 退出。
+- **顶部中间搜索框**：输入即匹配，排序优先级为「英文前缀 → 英文包含 → 中文释义包含」，最多列 8 条（更多时提示还有几个）。`↑↓` 切换候选、回车或点击选中，选中即调 `openQuiz()` 完成定位：选中节点 + 居中动画 + 邻接高亮 + 打开填空面板。框内按 Esc 只收起候选（`stopPropagation` 挡住全局 Esc，否则会连带关掉填空面板）。
+- **排布方式（右上角单选框）**：三选一。
+  - `力导向`：原 cose 布局，默认。
+  - `按记忆度` / `按权重`：Cytoscape `concentric` 布局，**回调返回值越大排得越靠圆心，向外逐圈扩散**。记忆度取 `Math.round(m * 10)` 分 11 档（记得越牢越靠中心，越外圈越该复习）；权重取后端返回的 `weight`（度中心性，缺失时退回 `node.degree()`）。Category 恒返回 100，钉在最中心。`levelWidth: () => 1` 保证一档一圈，否则节点会挤成一两圈。
+  - headless 实测：权重模式下 `exam`(12度) 距圆心 23、`critical`(7) 46、`anxiety`(2) 69；记忆度模式顺序正好翻转。
 - **右上角「＋」——给整张图增词**：弹窗提示「是否增加新的单词？」，滑块标注为「例句对高权重单词的依赖程度」（左「少依赖：挑边缘生词，长出更多新词」↔ 右「多依赖：围绕核心高频词」），`oninput` 防抖 250ms 调 `GET /api/seeds` **实时显示会选中哪些种子及其度数**；确认后以 `seeds: []` + `intensity` 调 `POST /api/automake`，完成后 `reloadGraph()` 销毁并重建 Cytoscape 实例，新长出来的词立刻出现在图上。
+- **生成结果面板**：生成完成后弹窗**不直接关闭**，而是切到结果视图，用两个大数字显示**本批生成了多少条例句、新增了多少个单词**；新词渲染成可点击的 chip，点一下就在图上定位到它。底部「再来一轮」回到表单视图（保持同一个焦点词），「完成」关闭弹窗。一个新词都没长出来时，提示把滑块往左拖更容易拽出生词。
 - **单词面板上的「＋」——围绕该词造句**：复用同一个弹窗，额外带 `focus_word`，滑块此时控制陪衬词取核心词还是生词。
 - 两个「＋」都需要明确分类（写库要落到某个 Category），**整图视图（URL 无 `?category=`）下隐藏**。
 - **邻接高亮**：点击节点后其邻接节点高亮、其余变暗。
-- `reloadGraph()` 期间 `state.cy` 会短暂为 `null`（destroy 后、重建前），`closeQuiz` / `closeSentencePanel` / 面板跟随解绑回调都加了空值守卫，避免此刻按 Esc 抛错。
+- `reloadGraph()` 期间 `state.cy` 会短暂为 `null`（destroy 后、重建前），`closeQuiz` / `closeSentencePanel` / 面板跟随解绑回调都加了空值守卫，避免此刻按 Esc 抛错；同时会 `hideSearch()`，因为搜索候选里存的是旧 cy 的节点引用。
+- **本页没有通用 `.hidden` 规则**：quiz / sentence 面板用 `opacity` 做淡出，各自按 id 声明。新增元素若要用 `classList.toggle('hidden')` 显隐，**必须按 id 补一条 `#xxx.hidden { display: none }`**，否则切换会静默失效（加通用 `.hidden` 则会破坏面板的淡出动画）。
 
 ---
 

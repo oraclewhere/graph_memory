@@ -75,7 +75,7 @@ python -m pytest -k <name>                    # 单个用例
 - **`automake.py`** — 核心自生长引擎（见上）。
 - **`weight.py`** — 单词重要度权重。基于六度空间理论：一个单词关联的节点越多越核心，记忆收益越高。**实时计算**（不存节点属性），v1 用度中心性（`ALL_WORD_DEGREES` 查询），**算法后续可升级 GDS PageRank**。`compute_weights()` 返回度中心性，`rank_words()` 结合记忆度给出推送顺序（复习侧），`select_seeds()` 按收敛强度选下一轮种子（生成侧，见下）。
 - **`memory.py`** — 记忆度（艾宾浩斯遗忘曲线）。`memory_strength = e^(-Δt / half_life)`，`half_life` 默认 7 天。单词**入图时 `memory_strength = 0.0`（从未复习）**，`POST /api/review` 复习成功后置 `1.0` 并写入 `last_reviewed_at = 现在`，之后随时间指数衰减。
-- **`graph_query.py`** — 图结构导出。`get_graph(gdb, category=None)` 把图导出为 `{nodes, edges}`（供前端可视化），指定 `category` 时只导出该分类子图。Word 节点带实时计算的记忆度；Sentence 节点的 `memory_strength` = 所含词记忆度的均值，并带 `words`（句内实词原形列表，供例句弹窗点击跳转）。
+- **`graph_query.py`** — 图结构导出。`get_graph(gdb, category=None)` 把图导出为 `{nodes, edges}`（供前端可视化），指定 `category` 时只导出该分类子图。Word 节点带实时计算的记忆度 + `weight`（度中心性，与 `weight.py` 同一个 `ALL_WORD_DEGREES` 查询，保证前端排布和推送排序口径一致）；Sentence 节点的 `memory_strength` = 所含词记忆度的均值、`weight` = 所含实词数，并带 `words`（句内实词原形列表，供例句弹窗点击跳转）。
 - **`review.py`** — 关联审查（**预留**，审查例句质量 / 新词是否该入图，逻辑待定）。
 - **`rumination.py`** — 反刍（**预留**，对生成结果二次修改，与艾宾浩斯复习无关，逻辑待定）。
 
@@ -100,7 +100,7 @@ python -m pytest -k <name>                    # 单个用例
 
 ### 查询接口（`app/api/routes.py`）
 
-- `GET /api/graph?category=` — 返回图 `{nodes, edges}`，Word 节点带实时记忆度；指定 `category` 时只返回该分类子图。
+- `GET /api/graph?category=` — 返回图 `{nodes, edges}`，Word 节点带实时记忆度和 `weight`（度中心性，供前端同心圆排布）；指定 `category` 时只返回该分类子图。
 - `GET /api/categories` — 返回所有分类及统计 `{categories: [{name, description, word_count, sentence_count}]}`（笔记列表用）。
 - `POST /api/candidate-words` — body `{category, n}`：让 LLM 生成候选种子单词（只调 LLM、不写库），返回 `{words}`，供半自动勾选。
 - `GET /api/seeds?category=&intensity=&k=&focus=` — 预览按收敛强度选出的种子（**只读图、不调 LLM、不写库**），返回 `{words: [{text, weight, weight_norm, distance}], intensity, focus, cold_start}`，供图页面滑块即时反馈。带 `focus` 时返回的是**陪衬词**（焦点词自身已从取样中排除，由前端展示）。
@@ -120,7 +120,11 @@ python -m pytest -k <name>                    # 单个用例
   - **节点亮度 = 记忆度**：Word 节点用单一蓝色从暗（记忆度低）到亮（记忆度高），Category 橙色、Sentence 灰色。
   - **点击单词节点 → 中文释义填空英文**：面板跟随节点移动（绑定 `pan zoom`），填对或「显示正确答案」都调 `POST /api/review` 更新记忆度、节点变亮，并自动跳到 rank 返回的下一个待复习词。
   - **点击例句节点 → 弹窗**：显示英文例句 + 中文翻译 + 句内实词的「词性/中文释义/英文释义」，句中单词可点击跳转到对应 Word 节点；Esc 退出弹窗。
+  - **顶部中间搜索框**：按英文前缀 → 英文包含 → 中文释义包含三级排序，最多 8 条候选，`↑↓` 切换、回车/点击选中 → 调 `openQuiz()` 定位（选中 + 居中 + 邻接高亮 + 打开填空面板）。框内 Esc 只收候选、`stopPropagation` 防止冒泡到全局 Esc 连带关掉填空面板。
+  - **排布方式（右上角单选）**：`力导向`（cose，默认）/ `按记忆度` / `按权重`。后两者用 Cytoscape 的 `concentric` 布局，**回调返回值越大排得越靠圆心**：记忆度 ×10 取整分 11 档（记得越牢越靠中心），权重取后端给的度中心性（缺失时退回 `node.degree()`），Category 恒返回 100 钉在最中心。`levelWidth: () => 1` 保证一档一圈，否则会挤成一两圈。
   - **右上角「＋」→ 增词弹窗**：提示「是否增加新的单词？」，滑块 = **例句对高权重单词的依赖程度**（左=少依赖挑生词 / 右=多依赖挑核心词），`oninput` 防抖 250ms 调 `GET /api/seeds` 实时预览会选中哪些种子及其度数；确认后调 `POST /api/automake`（`seeds: []` + `intensity`），完成后 `reloadGraph()` 就地重建 Cytoscape 实例。
+  - **生成结果面板**：生成完不再直接关窗，弹窗切到结果视图显示**本批例句数 + 新增单词数**，新词渲染成 chip，点击直接在图上定位；「再来一轮」回到表单（保持同一焦点词），「完成」关闭。没长出新词时给出提示（把滑块往左拖更容易出生词）。
+  - 本页**没有通用 `.hidden` 规则**（quiz/sentence 面板用 opacity 做淡出），新增元素要显隐必须按 id 补 `#xxx.hidden { display:none }`，否则 `classList.toggle('hidden')` 静默失效。
   - **单词面板上的「＋」→ 同一弹窗的焦点词模式**：围绕当前单词造句，`focus_word` 带上该词，滑块此时控制陪衬词取核心词还是生词。
   - 两个「＋」都需要明确分类（写库要落到某个 Category），**整图视图（无 `?category=`）下隐藏**。
   - **邻接高亮**：点击节点后其邻接节点高亮、其余变暗。

@@ -11,15 +11,18 @@ class FakeGraphGDB:
     """模拟 get_graph 需要的查询（含按分类过滤的查询）。"""
 
     def __init__(self, categories, words, sentences, relationships,
-                 word_categories=None, sentence_categories=None):
+                 word_categories=None, sentence_categories=None, degrees=None):
         self.categories = categories
         self.words = words
         self.sentences = sentences
         self.relationships = relationships
         self.word_categories = word_categories or {}
         self.sentence_categories = sentence_categories or {}
+        self.degrees = degrees or {}
 
     def run(self, query, **params):
+        if query == graph.ALL_WORD_DEGREES:
+            return [{"text": t, "degree": d} for t, d in self.degrees.items()]
         if query == graph.GET_ALL_CATEGORIES:
             return [{"c": c} for c in self.categories]
         if query == graph.GET_CATEGORY_BY_NAME:
@@ -135,3 +138,47 @@ def test_category_subgraph_filters_nodes_and_edges():
     assert all(e["source"] in node_ids and e["target"] in node_ids for e in result["edges"])
     # CONTAINS 边保留
     assert any(e["type"] == "CONTAINS" for e in result["edges"])
+
+
+# --- 权重：供前端做「按权重同心圆布局」，值越大越靠圆心 ---
+
+
+def _graph_with_degrees(degrees):
+    return FakeGraphGDB(
+        categories=[],
+        words=[
+            {"text": "exam", "pos": "noun", "definition_cn": "考试",
+             "definition_en": "a test", "frequency": 3, "last_reviewed_at": None},
+            {"text": "anxiety", "pos": "noun", "definition_cn": "焦虑",
+             "definition_en": "worry", "frequency": 1, "last_reviewed_at": None},
+        ],
+        sentences=[{"text": "exam anxiety is real", "translation": "考试焦虑是真的"}],
+        relationships=[
+            {"a_label": "Sentence", "a_key": "exam anxiety is real",
+             "b_label": "Word", "b_key": "exam", "type": "CONTAINS"},
+            {"a_label": "Sentence", "a_key": "exam anxiety is real",
+             "b_label": "Word", "b_key": "anxiety", "type": "CONTAINS"},
+        ],
+        degrees=degrees,
+    )
+
+
+def test_word_carries_degree_centrality_as_weight():
+    result = get_graph(_graph_with_degrees({"exam": 12, "anxiety": 2}))
+    weights = {n["properties"]["text"]: n["properties"]["weight"]
+               for n in result["nodes"] if n["label"] == "Word"}
+    assert weights == {"exam": 12, "anxiety": 2}
+
+
+def test_word_missing_from_degrees_gets_zero_weight():
+    """孤立词不在度查询结果里时权重记 0，不能 KeyError。"""
+    result = get_graph(_graph_with_degrees({"exam": 12}))
+    weights = {n["properties"]["text"]: n["properties"]["weight"]
+               for n in result["nodes"] if n["label"] == "Word"}
+    assert weights["anxiety"] == 0
+
+
+def test_sentence_weight_is_contained_word_count():
+    result = get_graph(_graph_with_degrees({"exam": 12, "anxiety": 2}))
+    sent = [n for n in result["nodes"] if n["label"] == "Sentence"][0]
+    assert sent["properties"]["weight"] == 2

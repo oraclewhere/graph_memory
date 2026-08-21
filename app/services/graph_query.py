@@ -20,11 +20,16 @@ def get_graph(
     - id 格式：word:<text> / category:<name> / sentence:<text>
 
     记忆度：Word 按艾宾浩斯曲线实时计算；Sentence 取所含 Word 的记忆度均值。
+    权重：Word 取度中心性（与 `weight.py` 同源，全图口径）；Sentence 取所含词数。
+    前端用它做「按权重/记忆度同心圆布局」——值越大越靠近圆心。
     category 指定时只导出该分类的子图（其 Word/Sentence/Category 及内部边）。
     """
     now = datetime.now(timezone.utc)
     nodes: list[dict] = []
     edges: list[dict] = []
+
+    # 度中心性，与 weight.compute_weights 同一个查询，保证前端排布和推送排序口径一致
+    degrees = {r["text"]: r["degree"] for r in gdb.run(graph.ALL_WORD_DEGREES)}
 
     # Word：先算记忆度，并记录 text -> memory 供例句均值使用
     words_query = graph.GET_CATEGORY_WORDS if category else graph.GET_ALL_WORDS_FULL
@@ -45,6 +50,7 @@ def get_graph(
                 "definition_en": w.get("definition_en", ""),
                 "frequency": w.get("frequency", 0),
                 "memory_strength": round(mem, 4),
+                "weight": degrees.get(text, 0),
             },
         })
 
@@ -110,6 +116,7 @@ def get_graph(
         avg = (s / c) if c else 0.0
         sn["properties"]["memory_strength"] = round(avg, 4)
         sn["properties"]["words"] = sorted(sent_words.get(text, []))
+        sn["properties"]["weight"] = c          # 例句权重 = 所含实词数
         nodes.append(sn)
 
     return {"nodes": nodes, "edges": edges}

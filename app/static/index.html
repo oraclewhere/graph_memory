@@ -172,6 +172,49 @@
     color: var(--ink-3); font-size: 14px; z-index: 5;
   }
 
+  /* 顶部中间：搜索框 */
+  #search-wrap {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 14; width: 260px;
+  }
+  #search-input {
+    width: 100%; padding: 9px 12px; font-size: 13px;
+    background: var(--panel); color: var(--ink);
+    border: 1px solid var(--panel-border); border-radius: 8px; outline: none;
+  }
+  #search-input:focus { border-color: var(--blue-bright); }
+  #search-input::placeholder { color: var(--ink-3); }
+  #search-results {
+    margin-top: 4px; background: var(--panel);
+    border: 1px solid var(--panel-border); border-radius: 8px;
+    max-height: 260px; overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.65);
+  }
+  #search-results.hidden { display: none; }
+  .sr-item {
+    padding: 8px 12px; font-size: 13px; cursor: pointer;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .sr-item:hover, .sr-item.active { background: #2f2f2e; }
+  .sr-word { font-weight: 600; color: var(--ink); }
+  .sr-cn { color: var(--ink-3); font-size: 12px; flex: 1;
+           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sr-empty { padding: 8px 12px; font-size: 12px; color: var(--ink-3); }
+
+  /* 布局切换 */
+  #layout-bar {
+    position: absolute; top: 60px; right: 14px; z-index: 12;
+    display: flex; flex-direction: column; gap: 6px;
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  #layout-bar .lb-title { font-size: 11px; color: var(--ink-3); }
+  #layout-bar label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--ink-2); cursor: pointer;
+  }
+  #layout-bar input { accent-color: var(--blue-dim); margin: 0; }
+
   /* 右上角「+」：为整张图增词 */
   #grow-btn {
     position: absolute; top: 14px; right: 14px; z-index: 12;
@@ -236,6 +279,29 @@
   #grow-confirm { background: var(--blue-dim); border-color: var(--blue-dim); font-weight: 600; }
   #grow-confirm:hover { background: #2f7ad4; }
   #grow-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* 生成结果：本批例句数 / 新增单词 */
+  /* 注：本页没有通用 .hidden 规则（各面板自己定义，quiz/sentence 用 opacity
+     做淡出），所以这里按 id 单独声明，避免加通用规则破坏面板过渡动画 */
+  #grow-result.hidden, #grow-form.hidden { display: none; }
+  #res-label.hidden, #res-none.hidden { display: none; }
+  .res-nums { display: flex; gap: 12px; margin-bottom: 14px; }
+  .res-num {
+    flex: 1; background: #1b1b1a; border: 1px solid var(--panel-border);
+    border-radius: 10px; padding: 12px; text-align: center;
+  }
+  .res-num b { display: block; font-size: 24px; color: var(--blue-bright);
+               font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .res-num span { font-size: 11px; color: var(--ink-3); }
+  .res-label { font-size: 12px; color: var(--ink-3); margin-bottom: 8px; }
+  #res-words { display: flex; flex-wrap: wrap; gap: 6px; max-height: 150px; overflow-y: auto; }
+  .res-chip {
+    font-size: 12px; padding: 4px 9px; border-radius: 999px;
+    background: #2b2b2a; border: 1px solid var(--panel-border);
+    color: var(--blue-bright); cursor: pointer;
+  }
+  .res-chip:hover { border-color: var(--blue-dim); color: #fff; }
+  #res-none { font-size: 12px; color: var(--ink-3); }
 </style>
 </head>
 <body>
@@ -246,10 +312,23 @@
 <div id="topbar">
   <a class="back" href="/">← 笔记列表</a>
   <h1 id="title">graph_memory</h1>
-  <span class="hint">点击圆形单词填空 · 点击方形例句看内容 · 右上角「＋」增词</span>
+  <span class="hint">圆形单词填空 · 方形例句看内容 · 右上「＋」增词</span>
+</div>
+
+<div id="search-wrap">
+  <input id="search-input" type="text" placeholder="搜索单词…（↑↓ 选择，回车定位）"
+         autocomplete="off" spellcheck="false">
+  <div id="search-results" class="hidden"></div>
 </div>
 
 <button id="grow-btn" title="增加新的单词">＋</button>
+
+<div id="layout-bar">
+  <span class="lb-title">排布方式</span>
+  <label><input type="radio" name="layout" value="force" checked> 力导向</label>
+  <label><input type="radio" name="layout" value="memory"> 按记忆度</label>
+  <label><input type="radio" name="layout" value="weight"> 按权重</label>
+</div>
 
 <div id="legend">
   <div class="row"><span class="bar"></span></div>
@@ -287,9 +366,10 @@
 
 <div id="grow-modal" class="hidden">
   <div class="grow-card">
-    <div class="grow-title">是否增加新的单词？</div>
+    <div class="grow-title" id="grow-title">是否增加新的单词？</div>
     <div class="grow-sub" id="grow-sub"></div>
 
+    <div id="grow-form">
     <div class="grow-row">
       <span>例句对高权重单词的依赖程度</span>
       <b id="grow-int-val">0.50</b>
@@ -311,6 +391,22 @@
     <div class="modal-btns">
       <button id="grow-cancel">取消</button>
       <button id="grow-confirm">开始生成</button>
+    </div>
+    </div><!-- /grow-form -->
+
+    <div id="grow-result" class="hidden">
+      <div class="res-nums">
+        <div class="res-num"><b id="res-sentences">0</b><span>条例句</span></div>
+        <div class="res-num"><b id="res-new">0</b><span>个新单词</span></div>
+      </div>
+      <div class="res-label" id="res-label">本批新增的单词（点击可在图上定位）：</div>
+      <div id="res-words"></div>
+      <div id="res-none" class="hidden">这一批没有长出新词——说明种子周围已经很密了，
+        把滑块往左拖（少依赖高权重词）更容易拽出生词。</div>
+      <div class="modal-btns" style="margin-top:16px">
+        <button id="res-again">再来一轮</button>
+        <button id="res-close" style="background:var(--blue-dim);border-color:var(--blue-dim);font-weight:600">完成</button>
+      </div>
     </div>
   </div>
 </div>
@@ -365,6 +461,7 @@ function buildCy(data) {
         translation: p.translation ?? '',
         words: p.words ?? [],
         memory_strength: p.memory_strength ?? null,
+        weight: p.weight ?? null,
       },
     });
   });
@@ -446,16 +543,7 @@ function buildCy(data) {
       { selector: 'edge.highlighted', style: { 'opacity': 1, 'line-color': '#cde2fb', 'target-arrow-color': '#cde2fb', 'width': 2.5 } },
       { selector: 'node.highlighted', style: { 'opacity': 1 } },
     ],
-    layout: {
-      name: 'cose',
-      animate: false,
-      nodeOverlap: 24,
-      nodeRepulsion: 9000,
-      idealEdgeLength: 90,
-      edgeElasticity: 90,
-      gravity: 0.25,
-      numIter: 1500,
-    },
+    layout: layoutOptions(),   // 跟随当前排布方式（力导向 / 记忆度 / 权重）
   });
 
   state.cy.on('tap', 'node', onNodeTap);
@@ -670,6 +758,149 @@ async function markReviewed(node) {
   closeQuiz();
 }
 
+// --- 搜索：顶部中间输入框，定位并选中单词 ---
+
+const search = { matches: [], active: -1 };
+
+function allWordNodes() {
+  return state.cy ? state.cy.nodes('[label="Word"]') : [];
+}
+
+function runSearch(raw) {
+  const q = raw.trim().toLowerCase();
+  const box = $('search-results');
+  if (!q) { hideSearch(); return; }
+
+  const hits = [];
+  allWordNodes().forEach((n) => {
+    const text = String(n.data('text') || '').toLowerCase();
+    const cn = String(n.data('definition_cn') || '');
+    // 英文前缀优先，其次英文包含，最后中文释义包含
+    let rank = -1;
+    if (text.startsWith(q)) rank = 0;
+    else if (text.includes(q)) rank = 1;
+    else if (cn.includes(raw.trim())) rank = 2;
+    if (rank >= 0) hits.push({ node: n, rank: rank, text: text });
+  });
+  hits.sort((a, b) => (a.rank - b.rank) || a.text.localeCompare(b.text));
+
+  search.matches = hits.slice(0, 8).map((h) => h.node);
+  search.active = search.matches.length ? 0 : -1;
+  renderSearchResults(hits.length);
+  box.classList.remove('hidden');
+}
+
+function renderSearchResults(total) {
+  const box = $('search-results');
+  box.innerHTML = '';
+  if (!search.matches.length) {
+    const d = document.createElement('div');
+    d.className = 'sr-empty';
+    d.textContent = '没有匹配的单词';
+    box.appendChild(d);
+    return;
+  }
+  search.matches.forEach((n, i) => {
+    const row = document.createElement('div');
+    row.className = 'sr-item' + (i === search.active ? ' active' : '');
+    const w = document.createElement('span');
+    w.className = 'sr-word';
+    w.textContent = n.data('text');
+    const cn = document.createElement('span');
+    cn.className = 'sr-cn';
+    cn.textContent = n.data('definition_cn') || '';
+    row.appendChild(w);
+    row.appendChild(cn);
+    row.addEventListener('mousedown', (e) => { e.preventDefault(); pickSearch(i); });
+    box.appendChild(row);
+  });
+  if (total > search.matches.length) {
+    const more = document.createElement('div');
+    more.className = 'sr-empty';
+    more.textContent = '另有 ' + (total - search.matches.length) + ' 个匹配，请输入更多字符';
+    box.appendChild(more);
+  }
+}
+
+function moveSearchActive(delta) {
+  if (!search.matches.length) return;
+  search.active = (search.active + delta + search.matches.length) % search.matches.length;
+  renderSearchResults(search.matches.length);
+}
+
+function pickSearch(i) {
+  const node = search.matches[i];
+  if (!node) return;
+  hideSearch();
+  $('search-input').blur();
+  openQuiz(node);          // 选中 + 居中 + 邻接高亮 + 打开填空面板
+}
+
+function hideSearch() {
+  $('search-results').classList.add('hidden');
+  search.matches = [];
+  search.active = -1;
+}
+
+$('search-input').addEventListener('input', (e) => runSearch(e.target.value));
+$('search-input').addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); moveSearchActive(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); moveSearchActive(-1); }
+  else if (e.key === 'Enter') { e.preventDefault(); pickSearch(search.active); }
+  // 搜索框里的 Esc 只收起候选，不要冒泡到全局 Esc（那会连带关掉填空面板）
+  else if (e.key === 'Escape') {
+    e.preventDefault(); e.stopPropagation();
+    hideSearch(); $('search-input').blur();
+  }
+});
+$('search-input').addEventListener('blur', () => setTimeout(hideSearch, 120));
+
+// --- 排布方式：力导向 / 按记忆度 / 按权重（值越大越靠圆心）---
+
+let layoutMode = 'force';
+
+function layoutOptions() {
+  if (layoutMode === 'force') {
+    return {
+      name: 'cose', animate: false, nodeOverlap: 24, nodeRepulsion: 9000,
+      idealEdgeLength: 90, edgeElasticity: 90, gravity: 0.25, numIter: 1500,
+    };
+  }
+  // concentric：返回值越大，节点排得越靠近圆心
+  return {
+    name: 'concentric',
+    animate: false,
+    concentric: concentricValue,
+    levelWidth: () => 1,          // 每一档一圈，避免全挤成一两圈
+    minNodeSpacing: 22,
+    equidistant: false,
+    avoidOverlap: true,
+  };
+}
+
+function concentricValue(node) {
+  const label = node.data('label');
+  if (label === 'Category') return 100;      // 分类恒在最中心
+  if (layoutMode === 'memory') {
+    // 记忆度 0~1 → 分成 11 档，记得越牢越靠中心
+    return Math.round((node.data('memory_strength') ?? 0) * 10);
+  }
+  // 权重：度中心性（后端给），缺失时退回图内实际度数
+  const w = node.data('weight');
+  return (w == null) ? node.degree() : w;
+}
+
+function applyLayout(mode) {
+  layoutMode = mode;
+  if (!state.cy) return;
+  state.cy.layout(layoutOptions()).run();
+  state.cy.fit(undefined, 40);
+}
+
+document.querySelectorAll('input[name="layout"]').forEach((el) => {
+  el.addEventListener('change', () => { if (el.checked) applyLayout(el.value); });
+});
+
 // --- 增词：右上角「+」= 给整张图增词；单词面板「+」= 围绕该词造句 ---
 // 两者共用一个弹窗，区别只在有没有「焦点词」。
 // 滑块 = 例句对高权重单词的依赖程度：高则种子取核心高频词，低则取边缘生词。
@@ -695,12 +926,43 @@ function setGrowStatus(msg, cls) {
 
 function openGrowModal(focusWord) {
   grow.focus = focusWord || null;
+  $('grow-title').textContent = '是否增加新的单词？';
   $('grow-sub').innerHTML = grow.focus
     ? '围绕单词 <b>' + escapeHtml(grow.focus) + '</b> 生成新例句，句中出现的新词会自动入图。'
     : '为「<b>' + escapeHtml(CATEGORY || '') + '</b>」生成新例句，句中出现的新词会自动入图。';
   setGrowStatus('', '');
+  $('grow-form').classList.remove('hidden');    // 回到表单视图（可能上次停在结果视图）
+  $('grow-result').classList.add('hidden');
   $('grow-modal').classList.remove('hidden');
   previewGrowSeeds();
+}
+
+// 生成完成后把弹窗切到结果视图：本批多少例句、新增多少单词
+function showGrowResult(res) {
+  const newWords = res.new_words || [];
+  $('grow-title').textContent = '✓ 本批已生成';
+  $('grow-sub').innerHTML = '种子：<b>' + (res.seeds || []).map(escapeHtml).join('、') + '</b>';
+  $('res-sentences').textContent = (res.sentences || []).length;
+  $('res-new').textContent = newWords.length;
+
+  const box = $('res-words');
+  box.innerHTML = '';
+  newWords.forEach((w) => {
+    const chip = document.createElement('span');
+    chip.className = 'res-chip';
+    chip.textContent = w;
+    chip.title = '在图上定位 ' + w;
+    chip.addEventListener('click', () => {
+      const node = state.cy && state.cy.getElementById('word:' + w);
+      if (node && node.length) { closeGrowModal(); openQuiz(node[0]); }
+    });
+    box.appendChild(chip);
+  });
+  $('res-label').classList.toggle('hidden', newWords.length === 0);
+  $('res-none').classList.toggle('hidden', newWords.length > 0);
+
+  $('grow-form').classList.add('hidden');
+  $('grow-result').classList.remove('hidden');
 }
 
 function closeGrowModal() {
@@ -760,10 +1022,9 @@ async function confirmGrow() {
       }),
     }).then((r) => r.json());
     if (res.ok) {
-      setGrowStatus('新增 ' + res.new_words.length + ' 个单词、' +
-        res.sentences.length + ' 条例句，正在刷新图…', 'ok');
-      await reloadGraph();
-      closeGrowModal();
+      setGrowStatus('生成完毕，正在刷新图…', 'ok');
+      await reloadGraph();          // 先刷图，结果面板里的单词才点得到
+      showGrowResult(res);
     } else {
       setGrowStatus('生成失败', 'err');
     }
@@ -777,6 +1038,7 @@ async function confirmGrow() {
 async function reloadGraph() {
   closeQuiz();                 // 先收面板（此时 cy 还在）
   closeSentencePanel();
+  hideSearch();                // 候选里存的是旧 cy 的节点引用，作废
   if (state.cy) { state.cy.destroy(); state.cy = null; }
   $('loading').textContent = '刷新图中…';
   $('loading').style.display = 'flex';
@@ -785,6 +1047,8 @@ async function reloadGraph() {
 
 $('grow-btn').onclick = () => openGrowModal(null);
 $('grow-cancel').onclick = closeGrowModal;
+$('res-close').onclick = closeGrowModal;
+$('res-again').onclick = () => openGrowModal(grow.focus);   // 保持同一个焦点词再来一轮
 $('grow-confirm').onclick = confirmGrow;
 $('grow-intensity').oninput = scheduleGrowPreview;
 $('quiz-add').onclick = () => {
