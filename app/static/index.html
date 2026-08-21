@@ -334,8 +334,6 @@
   <span class="hint">圆形单词填空 · 方形例句看内容 · 右上「＋」增词</span>
 </div>
 
-<a class="back" href="#" id="logout-btn" style="position:absolute;top:14px;right:14px;z-index:15;font-size:13px;color:var(--ink-2);text-decoration:none;padding:4px 10px;border:1px solid var(--panel-border);border-radius:6px;background:var(--panel);">退出</a>
-
 <div id="search-wrap">
   <input id="search-input" type="text" placeholder="搜索单词…（↑↓ 选择，回车定位）"
          autocomplete="off" spellcheck="false">
@@ -1236,14 +1234,6 @@ $('btn-show-answer').onclick = () => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') handleEscape();
 });
-
-// 退出登录
-$('logout-btn').onclick = (e) => {
-  e.preventDefault();
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  location.href = '/login';
-};
 
 loadGraph().catch((e) => {
   $('loading').textContent = '加载失败：请确认后端服务已启动（uvicorn app.main:app）';
