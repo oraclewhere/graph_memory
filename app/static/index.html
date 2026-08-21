@@ -844,7 +844,9 @@ async function markReviewed(node) {
   const text = node.data('text');
   let res;
   try {
-    res = await fetch('/api/review', {
+    // 传入 category 参数，让 next 只在当前分类内排名
+    const params = CATEGORY ? '?category=' + encodeURIComponent(CATEGORY) : '';
+    res = await fetch('/api/review' + params, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ word: text }),

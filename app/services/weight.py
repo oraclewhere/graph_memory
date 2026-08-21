@@ -19,12 +19,19 @@ from app.services.memory import DEFAULT_HALF_LIFE_DAYS, memory_strength_at
 DEFAULT_INTENSITY = 0.5
 
 
-def compute_weights(gdb: db_module.GraphDB) -> list[dict]:
+def compute_weights(
+    gdb: db_module.GraphDB,
+    category: str | None = None,
+) -> list[dict]:
     """实时计算每个单词的度中心性（关联边数量）作为重要度权重。
 
+    指定 category 时只计算该分类内的单词。
     返回按权重降序排列的 [{"text": ..., "weight": ...}, ...]。
     """
-    records = gdb.run(graph.ALL_WORD_DEGREES)
+    if category:
+        records = gdb.run(graph.CATEGORY_WORD_DEGREES, category=category)
+    else:
+        records = gdb.run(graph.ALL_WORD_DEGREES)
     return [{"text": r["text"], "weight": r["degree"]} for r in records]
 
 
@@ -91,6 +98,7 @@ def rank_words(
     gdb: db_module.GraphDB,
     half_life_days: float = DEFAULT_HALF_LIFE_DAYS,
     limit: int | None = None,
+    category: str | None = None,
 ) -> list[dict]:
     """按「重要度 × 遗忘比例」降序排列，得出推送复习的顺序。
 
@@ -99,10 +107,11 @@ def rank_words(
     - 权重低或已记住 → 低分，靠后
 
     权重先归一化到 0~1（除以最大度），记忆度本就是 0~1，两者可乘。
+    指定 category 时只返回该分类内的单词。
 
     返回 [{"text", "weight", "weight_norm", "memory_strength", "score"}, ...]。
     """
-    weights = compute_weights(gdb)
+    weights = compute_weights(gdb, category=category)
     max_w = max((w["weight"] for w in weights), default=0) or 1
 
     now = datetime.now(timezone.utc)
@@ -110,6 +119,12 @@ def rank_words(
         r["text"]: memory_strength_at(r.get("last_reviewed_at"), now, half_life_days)
         for r in gdb.run(graph.GET_WORDS_REVIEW)
     }
+
+    # 如果指定了分类，只保留该分类内的单词
+    if category:
+        category_words = {w["text"] for w in weights}
+    else:
+        category_words = None
 
     scored = []
     for w in weights:

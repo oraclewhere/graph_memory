@@ -159,22 +159,24 @@ def automake(req: AutoMakeRequest) -> dict:
 
 
 @router.get("/rank")
-def rank(limit: int | None = None) -> dict:
-    """按「权重归一化 × (1 - 记忆度)」降序返回推送复习顺序。"""
+def rank(limit: int | None = None, category: str | None = None) -> dict:
+    """按「权重归一化 × (1 - 记忆度)」降序返回推送复习顺序。
+    指定 category 时只返回该分类内的单词。"""
     gdb = db_module.GraphDB()
     try:
-        return {"words": rank_words(gdb, limit=limit)}
+        return {"words": rank_words(gdb, limit=limit, category=category)}
     finally:
         gdb.close()
 
 
 @router.post("/review")
-def review(req: ReviewRequest) -> dict:
-    """复习成功：重置该词记忆度，返回更新后的词 + 下一个待复习词（rank 第一位）。"""
+def review(req: ReviewRequest, category: str | None = None) -> dict:
+    """复习成功：重置该词记忆度，返回更新后的词 + 下一个待复习词（rank 第一位）。
+    指定 category 时，next 只在该分类内排名。"""
     gdb = db_module.GraphDB()
     try:
         updated = memory.review_word(gdb, req.word)
-        next_words = rank_words(gdb, limit=1)
+        next_words = rank_words(gdb, limit=1, category=category)
         return {
             "ok": updated is not None,
             "word": req.word,
