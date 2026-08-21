@@ -1188,11 +1188,11 @@ $('btn-retry').onclick = () => {
 };
 
 $('btn-show-answer').onclick = () => {
-  $('modal-answer').innerHTML = '正确答案：<b>' + state.pendingAnswer + '</b>';
+  // 显示答案不算复习成功，不跳转下一个，让用户继续复习这个词
+  // 在 feedback 区域显示正确答案，而不是在错误弹窗里
   state.pending = null;
   $('modal').classList.add('hidden');
-  // 显示答案不算复习成功，不跳转下一个，让用户继续复习这个词
-  setFeedback('已显示答案，请记忆后再次尝试', '');
+  setFeedback('正确答案：<b style="color:var(--blue-bright)">' + state.pendingAnswer + '</b>，请记忆后再次输入', '');
   $('quiz-input').value = '';
   $('quiz-input').focus();
 };
