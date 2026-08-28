@@ -2743,6 +2743,10 @@ async function revealLetters(word) {
   container.innerHTML = '';
   const perLetterMs = state.memory.perLetterMs;
 
+  // 清除旧的跳过提示（防止重复添加）
+  const oldHint = $('mc-skip-hint');
+  if (oldHint) oldHint.remove();
+
   // 添加点击跳过提示
   const hint = document.createElement('div');
   hint.id = 'mc-skip-hint';
@@ -2759,33 +2763,39 @@ async function revealLetters(word) {
   };
   $('memory-card').addEventListener('click', skipHandler);
 
-  for (let i = 0; i < word.length; i++) {
-    if (state.memory._skipAnimation) break;
+  try {
+    for (let i = 0; i < word.length; i++) {
+      if (state.memory._skipAnimation) break;
 
-    const span = document.createElement('span');
-    span.className = 'mc-letter visible'; // 跳过时直接显示
-    span.textContent = word[i];
-    container.appendChild(span);
+      const span = document.createElement('span');
+      span.className = 'mc-letter';
+      span.textContent = word[i];
+      container.appendChild(span);
 
-    if (!state.memory._skipAnimation) {
-      await sleep(perLetterMs);
+      // 强制重绘后添加 visible 类（实现淡入效果）
+      void span.offsetWidth;
+      span.classList.add('visible');
+
+      if (!state.memory._skipAnimation) {
+        await sleep(perLetterMs);
+      }
     }
-  }
 
-  // 如果跳过了，确保所有字母都显示
-  if (state.memory._skipAnimation) {
-    container.innerHTML = word.split('').map(c =>
-      `<span class="mc-letter visible">${c}</span>`
-    ).join('');
-  }
+    // 如果跳过了，确保所有字母都显示
+    if (state.memory._skipAnimation) {
+      container.innerHTML = word.split('').map(c =>
+        `<span class="mc-letter visible">${c}</span>`
+      ).join('');
+    }
 
-  // 移除点击处理器和提示
-  $('memory-card').removeEventListener('click', skipHandler);
-  hint.remove();
-
-  // 等待基础时间（也可跳过）
-  if (!state.memory._skipAnimation) {
-    await sleep(state.memory.baseMs);
+    // 等待基础时间（也可跳过）
+    if (!state.memory._skipAnimation) {
+      await sleep(state.memory.baseMs);
+    }
+  } finally {
+    // 确保移除点击处理器和提示（即使发生错误）
+    $('memory-card').removeEventListener('click', skipHandler);
+    if (hint.parentNode) hint.remove();
   }
 }
 
@@ -3389,6 +3399,9 @@ async function retryWrongWords() {
     $('memory-card-overlay').classList.remove('hidden');
     $('memory-card').classList.remove('flipped');
     $('mc-progress').textContent = `重新记忆错误单词`;
+
+    // 清空字母容器，防止残留
+    $('mc-letters').innerHTML = '';
 
     await revealLetters(word);
 
