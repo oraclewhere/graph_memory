@@ -2623,6 +2623,9 @@ document.querySelectorAll('input[name="memory-placement"]').forEach(el => {
 async function startMemoryFlow(node) {
   if (state.memory.phase !== 'idle') return;
 
+  // 立即锁定，防止双击节点导致多个流程并发
+  state.memory.phase = 'starting';
+
   // 重置状态
   state.memory.wrongWords = [];
   state.memory.stats = { total: 0, correct: 0, wrong: 0, rounds: 0 };
@@ -2630,7 +2633,10 @@ async function startMemoryFlow(node) {
   // 构建例句队列
   await buildMemorySentences(node);
 
-  if (state.memory.sentences.length === 0) return;
+  if (state.memory.sentences.length === 0) {
+    state.memory.phase = 'idle';
+    return;
+  }
 
   state.memory.sentenceIndex = 0;
   state.memory.wordIndex = 0;
@@ -2737,9 +2743,10 @@ async function revealPhase() {
   showCardBack(m.currentCard);
 }
 
-// 逐字母揭示动画（支持点击跳过）
+// 逐字母揭示动画（支持点击卡片正面跳过）
 async function revealLetters(word) {
   const container = $('mc-letters');
+  const front = $('mc-front');
   const perLetterMs = state.memory.perLetterMs;
 
   // 完全重置容器
@@ -2752,21 +2759,18 @@ async function revealLetters(word) {
   // 添加点击跳过提示
   const hint = document.createElement('div');
   hint.id = 'mc-skip-hint';
-  hint.textContent = '点击任意位置跳过动画';
+  hint.textContent = '点击卡片跳过动画';
   hint.style.cssText = 'position:absolute;bottom:20px;left:0;right:0;text-align:center;font-size:12px;color:var(--ink-3);pointer-events:none;';
-  $('mc-front').appendChild(hint);
+  front.appendChild(hint);
 
   // 创建独立的跳过控制对象
   const skipControl = { skipped: false };
 
-  // 点击卡片跳过（使用 document 级别，避免事件冒泡问题）
-  const skipHandler = (e) => {
-    // 只在卡片正面时响应
-    if (!$('memory-card').classList.contains('flipped')) {
-      skipControl.skipped = true;
-    }
+  // 只在点击卡片正面时跳过（避免误触发 document 上其他点击）
+  const skipHandler = () => {
+    skipControl.skipped = true;
   };
-  document.addEventListener('click', skipHandler, true);
+  front.addEventListener('click', skipHandler);
 
   try {
     // 逐个字母揭示
@@ -2797,7 +2801,7 @@ async function revealLetters(word) {
     }
   } finally {
     // 确保移除点击处理器和提示
-    document.removeEventListener('click', skipHandler, true);
+    front.removeEventListener('click', skipHandler);
     if (hint.parentNode) hint.remove();
   }
 }
@@ -2815,13 +2819,19 @@ function showCardBack(card) {
 $('mc-next').addEventListener('click', async () => {
   if (state.memory.phase !== 'showing') return;
 
+  // 重试模式：由 retryWrongWords 自己管理流程，这里不做任何事
+  if (state.memory._retryMode) {
+    return;
+  }
+
+  // 立即锁定，防止双击导致多个 revealPhase 并发
+  state.memory.phase = 'advancing';
   state.memory.stats.total++;
 
   // 关闭卡片
   $('memory-card').classList.remove('flipped');
   await sleep(300); // 等待翻转动画
   $('memory-card-overlay').classList.add('hidden');
-  state.memory.phase = 'idle';
 
   // 跳到下一个单词
   state.memory.wordIndex++;
@@ -3288,6 +3298,10 @@ function checkFillResults() {
 function handlePlacementResult(allCorrect) {
   const m = state.memory;
 
+  // 防重入：同一归位结果只处理一次（防止双击提交导致多个 retryWrongWords 并发）
+  if (m.phase !== 'placement') return;
+  m.phase = 'processing';
+
   if (allCorrect) {
     $('mp-feedback').textContent = '✓ 全部正确！';
     $('mp-feedback').className = 'ok';
@@ -3364,6 +3378,9 @@ async function retryWrongWords() {
   const wrongWords = [...m.wrongWords];
   m.wrongWords = [];
 
+  // 进入重试模式：禁用 mc-next 全局处理器
+  m._retryMode = true;
+
   // 替换当前句子的单词列表
   const origSentence = m.sentences[m.sentenceIndex];
   const origWords = [...origSentence.words];
@@ -3371,51 +3388,56 @@ async function retryWrongWords() {
   // 用错误单词替换
   m.sentences[m.sentenceIndex].words = wrongWords;
 
-  // 逐个揭示错误单词
-  for (let idx = 0; idx < wrongWords.length; idx++) {
-    const word = wrongWords[idx];
-    const wordNode = state.cy.getElementById('word:' + word);
-    const defCn = wordNode.length ? (wordNode.data('definition_cn') || '') : '';
-    const defEn = wordNode.length ? (wordNode.data('definition_en') || '') : '';
+  try {
+    // 逐个揭示错误单词
+    for (let idx = 0; idx < wrongWords.length; idx++) {
+      const word = wrongWords[idx];
+      const wordNode = state.cy.getElementById('word:' + word);
+      const defCn = wordNode.length ? (wordNode.data('definition_cn') || '') : '';
+      const defEn = wordNode.length ? (wordNode.data('definition_en') || '') : '';
 
-    m.currentCard = {
-      word, defCn, defEn,
-      sentenceText: origSentence.sentenceText,
-      translation: origSentence.translation,
-      node: wordNode,
-    };
+      m.currentCard = {
+        word, defCn, defEn,
+        sentenceText: origSentence.sentenceText,
+        translation: origSentence.translation,
+        node: wordNode,
+      };
 
-    if (wordNode.length) {
-      wordNode.addClass('memory-highlight');
-      state.cy.animate({ center: { eles: wordNode }, zoom: 1.2 }, { duration: 300 });
-    }
+      if (wordNode.length) {
+        wordNode.addClass('memory-highlight');
+        state.cy.animate({ center: { eles: wordNode }, zoom: 1.2 }, { duration: 300 });
+      }
 
-    // 确保卡片显示正面
-    $('memory-card-overlay').classList.remove('hidden');
-    $('memory-card').classList.remove('flipped');
-    $('mc-progress').textContent = `重新记忆错误单词 (${idx + 1}/${wrongWords.length})`;
+      // 确保卡片显示正面
+      $('memory-card-overlay').classList.remove('hidden');
+      $('memory-card').classList.remove('flipped');
+      $('mc-progress').textContent = `重新记忆错误单词 (${idx + 1}/${wrongWords.length})`;
 
-    // 设置状态为 revealing
-    m.phase = 'revealing';
+      // 设置状态为 revealing
+      m.phase = 'revealing';
 
-    // 揭示字母
-    await revealLetters(word);
+      // 揭示字母
+      await revealLetters(word);
 
-    // 翻转卡片显示释义
-    m.phase = 'showing';
-    $('memory-card').classList.add('flipped');
-    showCardBack(m.currentCard);
+      // 翻转卡片显示释义
+      m.phase = 'showing';
+      $('memory-card').classList.add('flipped');
+      showCardBack(m.currentCard);
 
-    // 等待用户点击"下一个"（使用 Promise 包装 mc-next 的点击事件）
-    await new Promise(resolve => {
-      const checkInterval = setInterval(() => {
-        // 只有当 phase 从 showing 变为其他状态时才继续
-        if (m.phase !== 'showing') {
-          clearInterval(checkInterval);
+      // 等待用户点击"下一个"（使用独立的监听器，不影响全局处理器）
+      await new Promise(resolve => {
+        const onNext = () => {
+          $('mc-next').removeEventListener('click', onNext);
+          // 翻转回正面
+          $('memory-card').classList.remove('flipped');
           resolve();
-        }
-      }, 50);
-    });
+        };
+        $('mc-next').addEventListener('click', onNext);
+      });
+    }
+  } finally {
+    // 退出重试模式
+    m._retryMode = false;
   }
 
   // 恢复原始单词列表，重新归位
