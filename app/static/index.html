@@ -40,15 +40,15 @@
   }
 
   /* 模式容器控制 */
-  #explore-view, #review-view {
+  #explore-view, #review-view, #memory-view {
     position: absolute;
     inset: 0;
     pointer-events: none;
   }
-  #explore-view.hidden, #review-view.hidden {
+  #explore-view.hidden, #review-view.hidden, #memory-view.hidden {
     display: none;
   }
-  #explore-view > *, #review-view > * {
+  #explore-view > *, #review-view > *, #memory-view > * {
     pointer-events: auto;
   }
 
@@ -1455,11 +1455,17 @@ function handleEscape() {
   // 记忆模式：关闭卡片和归位面板
   if (!$('memory-card-overlay').classList.contains('hidden')) {
     $('memory-card-overlay').classList.add('hidden');
+    $('memory-card').classList.remove('flipped');
     state.memory.phase = 'idle';
+    state.memory._skipAnimation = true; // 确保动画停止
+    // 显示提示
+    showToast('记忆流程已中断，点击单词节点重新开始');
     return;
   }
   if (!$('memory-placement-overlay').classList.contains('hidden')) {
     $('memory-placement-overlay').classList.add('hidden');
+    state.memory.phase = 'idle';
+    showToast('记忆流程已中断，点击单词节点重新开始');
     return;
   }
   if (!$('memory-done-overlay').classList.contains('hidden')) {
@@ -1468,6 +1474,20 @@ function handleEscape() {
   }
   closeQuiz();
   closeSentencePanel();
+}
+
+// 简单的 toast 提示函数
+function showToast(msg, duration = 2000) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--panel);color:var(--ink-2);padding:10px 20px;border-radius:8px;border:1px solid var(--panel-border);font-size:13px;z-index:1000;opacity:0;transition:opacity 0.3s;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  setTimeout(() => { toast.style.opacity = '0'; }, duration);
 }
 
 function openQuiz(node) {
@@ -2581,7 +2601,15 @@ function initializeMemoryMode() {
 // 记忆模式归位选项切换
 document.querySelectorAll('input[name="memory-placement"]').forEach(el => {
   el.addEventListener('change', () => {
-    if (el.checked) state.memory.placementMode = el.value;
+    if (el.checked) {
+      state.memory.placementMode = el.value;
+      // 如果正在进行记忆流程，重置状态以便重新开始
+      if (state.memory.phase !== 'idle') {
+        state.memory.phase = 'idle';
+        $('memory-card-overlay').classList.add('hidden');
+        $('memory-placement-overlay').classList.add('hidden');
+      }
+    }
   });
 });
 
@@ -2611,28 +2639,35 @@ async function buildMemorySentences(startNode) {
   const seenSentences = new Set();
 
   if (startNode.data('label') === 'Sentence') {
-    // 点击例句节点：直接使用该例句
+    // 点击例句节点：直接使用该例句，随机打乱单词顺序
     const words = startNode.data('words') || [];
     if (words.length > 0) {
+      const shuffledWords = [...words];
+      shuffleArray(shuffledWords);
       sentences.push({
         node: startNode,
-        words: [...words],
+        words: shuffledWords,
         translation: startNode.data('translation') || '',
         sentenceText: startNode.data('text') || '',
+        startWord: null, // 例句节点没有特定起始词
       });
     }
   } else if (startNode.data('label') === 'Word') {
-    // 点击单词节点：找到包含该词的所有例句
+    // 点击单词节点：找到包含该词的所有例句，从点击的单词开始
     const wordText = startNode.data('text');
     state.cy.nodes('[label="Sentence"]').forEach(sNode => {
       const words = sNode.data('words') || [];
       if (words.includes(wordText) && !seenSentences.has(sNode.id())) {
         seenSentences.add(sNode.id());
+        // 随机打乱单词顺序，但把点击的单词放在第一位
+        const otherWords = words.filter(w => w !== wordText);
+        shuffleArray(otherWords);
         sentences.push({
           node: sNode,
-          words: [...words],
+          words: [wordText, ...otherWords], // 点击的词在第一位
           translation: sNode.data('translation') || '',
           sentenceText: sNode.data('text') || '',
+          startWord: wordText,
         });
       }
     });
@@ -2696,27 +2731,56 @@ async function revealPhase() {
   showCardBack(m.currentCard);
 }
 
-// 逐字母揭示动画
+// 逐字母揭示动画（支持点击跳过）
 async function revealLetters(word) {
   const container = $('mc-letters');
   container.innerHTML = '';
   const perLetterMs = state.memory.perLetterMs;
 
+  // 添加点击跳过提示
+  const hint = document.createElement('div');
+  hint.id = 'mc-skip-hint';
+  hint.textContent = '点击卡片跳过动画';
+  hint.style.cssText = 'position:absolute;bottom:20px;left:0;right:0;text-align:center;font-size:12px;color:var(--ink-3);pointer-events:none;';
+  $('mc-front').appendChild(hint);
+
+  // 设置跳过标志
+  state.memory._skipAnimation = false;
+
+  // 点击卡片跳过
+  const skipHandler = () => {
+    state.memory._skipAnimation = true;
+  };
+  $('memory-card').addEventListener('click', skipHandler);
+
   for (let i = 0; i < word.length; i++) {
+    if (state.memory._skipAnimation) break;
+
     const span = document.createElement('span');
-    span.className = 'mc-letter';
+    span.className = 'mc-letter visible'; // 跳过时直接显示
     span.textContent = word[i];
     container.appendChild(span);
 
-    // 强制重绘后添加可见类
-    void span.offsetWidth;
-    span.classList.add('visible');
-
-    await sleep(perLetterMs);
+    if (!state.memory._skipAnimation) {
+      await sleep(perLetterMs);
+    }
   }
 
-  // 所有字母显示完后等待基础时间
-  await sleep(state.memory.baseMs);
+  // 如果跳过了，确保所有字母都显示
+  if (state.memory._skipAnimation) {
+    container.innerHTML = word.split('').map(c =>
+      `<span class="mc-letter visible">${c}</span>`
+    ).join('');
+  }
+
+  // 移除点击处理器和提示
+  $('memory-card').removeEventListener('click', skipHandler);
+  hint.remove();
+
+  // 等待基础时间（也可跳过）
+  if (!state.memory._skipAnimation) {
+    await sleep(state.memory.baseMs);
+  }
 }
 
 // 显示卡片背面内容
