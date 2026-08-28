@@ -3274,14 +3274,20 @@ function handlePlacementResult(allCorrect) {
     $('mp-feedback').className = 'ok';
     m.stats.correct++;
 
-    // 更新单词记忆度
+    // 更新单词记忆度（调用后端 API 持久化）
     const sentence = m.sentences[m.sentenceIndex];
     if (sentence) {
       sentence.words.forEach(w => {
         const node = state.cy.getElementById('word:' + w);
+        // 前端立即更新视觉效果
         if (node.length) node.data('memory_strength', 1.0);
-        if (state.cy) state.cy.style().update();
+        // 调用后端 API 持久化到数据库
+        apiFetch('/api/review', {
+          method: 'POST',
+          body: JSON.stringify({ word: w }),
+        }).catch(e => console.error('Failed to update memory for', w, e));
       });
+      if (state.cy) state.cy.style().update();
     }
 
     setTimeout(async () => {
@@ -3305,6 +3311,19 @@ function handlePlacementResult(allCorrect) {
     const wrongWords = Object.entries(m.placementResults)
       .filter(([_, v]) => v === 'wrong')
       .map(([w, _]) => w);
+
+    // 降低错误单词的记忆度
+    wrongWords.forEach(w => {
+      const node = state.cy.getElementById('word:' + w);
+      // 前端立即更新视觉效果
+      if (node.length) node.data('memory_strength', 0.1);
+      // 调用后端 API 持久化到数据库
+      apiFetch('/api/review/decrease', {
+        method: 'POST',
+        body: JSON.stringify({ word: w, target_memory: 0.1 }),
+      }).catch(e => console.error('Failed to decrease memory for', w, e));
+    });
+    if (state.cy) state.cy.style().update();
 
     setTimeout(async () => {
       $('memory-placement-overlay').classList.add('hidden');
