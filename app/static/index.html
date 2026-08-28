@@ -1185,6 +1185,7 @@ const CATEGORY = new URLSearchParams(location.search).get('category');
 if (CATEGORY) {
   $('title').textContent = CATEGORY;
   if ($('review-title')) $('review-title').textContent = CATEGORY;
+  if ($('memory-title')) $('memory-title').textContent = CATEGORY;
 }
 
 async function loadGraph() {
