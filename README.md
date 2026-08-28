@@ -52,6 +52,10 @@ uvicorn app.main:app --reload
 
 访问 http://localhost:8000 开始使用。
 
+## 截图
+
+![graph_memory 效果图](docs/images/image.png)
+
 ## 配置说明
 
 ### `config/llm.yaml` — LLM 配置
