@@ -2444,6 +2444,10 @@ async function decreaseMemoryForWord(text) {
 async function submitReviewAnswer() {
   if (!state.currentReviewWord) return;
 
+  // 如果已经提交过（显示答案中），忽略重复提交
+  if (state.currentReviewWord.submitted) return;
+  state.currentReviewWord.submitted = true;
+
   const inputs = $('review-word-input').querySelectorAll('input');
   const inputsArr = Array.from(inputs);
 
@@ -2451,6 +2455,7 @@ async function submitReviewAnswer() {
   const allFilled = inputsArr.every(inp => inp.value.trim() !== '');
   if (!allFilled) {
     setReviewFeedback('请填写所有空位', 'err');
+    state.currentReviewWord.submitted = false; // 重置标志
     return;
   }
 
