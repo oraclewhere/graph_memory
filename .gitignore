@@ -13,3 +13,4 @@ config/llm.yaml
 .idea/
 .vscode/
 .DS_Store
+uvicorn.log
