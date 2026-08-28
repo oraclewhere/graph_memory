@@ -1558,16 +1558,20 @@ function generateHiddenWord(word) {
     return { letters: word.split(''), hiddenIndices: [] };
   }
   if (len === 2) {
-    return { letters: word.split(''), hiddenIndices: [1] };
+    // 2 字母：随机隐藏 1 个
+    const idx = Math.random() < 0.5 ? 0 : 1;
+    return { letters: word.split(''), hiddenIndices: [idx] };
   }
   if (len === 3) {
-    return { letters: word.split(''), hiddenIndices: [1, 2] };
+    // 3 字母：隐藏 2 个，随机选 1 个显示
+    const shown = [0, 1, 2][Math.floor(Math.random() * 3)];
+    return { letters: word.split(''), hiddenIndices: [0, 1, 2].filter(i => i !== shown) };
   }
-  // 4+ 字母：隐藏 80%+
+  // 4+ 字母：隐藏 80%+，随机选择显示位置
   const totalHide = Math.max(1, Math.ceil(len * 0.8));
-  const candidates = Array.from({ length: len - 1 }, (_, i) => i + 1);
-  shuffleArray(candidates);
-  const hiddenSet = new Set(candidates.slice(0, totalHide));
+  const allIndices = Array.from({ length: len }, (_, i) => i);
+  shuffleArray(allIndices);
+  const hiddenSet = new Set(allIndices.slice(0, totalHide));
   return { letters: word.split(''), hiddenIndices: [...hiddenSet] };
 }
 
@@ -1936,9 +1940,18 @@ async function submitReviewAnswer() {
     return;
   }
 
-  // 收集用户答案
-  const userAnswer = inputsArr.map(inp => inp.value.toLowerCase()).join('');
-  const answer = state.currentReviewWord.word.toLowerCase();
+  // 收集用户答案：将显示字母和输入字母按原始位置拼接
+  const wordLetters = state.currentReviewWord.word;
+  const userAnswer = wordLetters.split('').map((letter, i) => {
+    if (state.currentReviewWord.hiddenIndices.includes(i)) {
+      // 隐藏的字母：从输入框取值
+      const input = inputsArr.find(inp => parseInt(inp.dataset.index) === i);
+      return (input ? input.value : '').toLowerCase();
+    }
+    // 显示的字母：直接用原字母
+    return letter.toLowerCase();
+  }).join('');
+  const answer = wordLetters.toLowerCase();
 
   if (userAnswer === answer) {
     setReviewFeedback('✓ 正确！', 'ok');
@@ -1960,8 +1973,9 @@ async function submitReviewAnswer() {
   } else {
     setReviewFeedback('✗ 错误，正确答案：' + answer, 'err');
     // 标记错误的输入框
-    inputsArr.forEach((inp, i) => {
-      const expected = answer[i];
+    inputsArr.forEach(inp => {
+      const pos = parseInt(inp.dataset.index);
+      const expected = wordLetters[pos].toLowerCase();
       if (inp.value.toLowerCase() === expected) {
         inp.classList.add('correct');
       } else {
