@@ -2740,32 +2740,44 @@ async function revealPhase() {
 // 逐字母揭示动画（支持点击跳过）
 async function revealLetters(word) {
   const container = $('mc-letters');
-  container.innerHTML = '';
   const perLetterMs = state.memory.perLetterMs;
 
-  // 清除旧的跳过提示（防止重复添加）
+  // 完全重置容器
+  container.innerHTML = '';
+
+  // 清除旧的跳过提示
   const oldHint = $('mc-skip-hint');
   if (oldHint) oldHint.remove();
 
   // 添加点击跳过提示
   const hint = document.createElement('div');
   hint.id = 'mc-skip-hint';
-  hint.textContent = '点击卡片跳过动画';
+  hint.textContent = '点击任意位置跳过动画';
   hint.style.cssText = 'position:absolute;bottom:20px;left:0;right:0;text-align:center;font-size:12px;color:var(--ink-3);pointer-events:none;';
   $('mc-front').appendChild(hint);
 
-  // 设置跳过标志
-  state.memory._skipAnimation = false;
+  // 创建独立的跳过控制对象
+  const skipControl = { skipped: false };
 
-  // 点击卡片跳过
-  const skipHandler = () => {
-    state.memory._skipAnimation = true;
+  // 点击卡片跳过（使用 document 级别，避免事件冒泡问题）
+  const skipHandler = (e) => {
+    // 只在卡片正面时响应
+    if (!$('memory-card').classList.contains('flipped')) {
+      skipControl.skipped = true;
+    }
   };
-  $('memory-card').addEventListener('click', skipHandler);
+  document.addEventListener('click', skipHandler, true);
 
   try {
+    // 逐个字母揭示
     for (let i = 0; i < word.length; i++) {
-      if (state.memory._skipAnimation) break;
+      if (skipControl.skipped) {
+        // 跳过了，直接显示所有剩余字母
+        container.innerHTML = word.split('').map(c =>
+          `<span class="mc-letter visible">${c}</span>`
+        ).join('');
+        break;
+      }
 
       const span = document.createElement('span');
       span.className = 'mc-letter';
@@ -2776,25 +2788,16 @@ async function revealLetters(word) {
       void span.offsetWidth;
       span.classList.add('visible');
 
-      if (!state.memory._skipAnimation) {
-        await sleep(perLetterMs);
-      }
-    }
-
-    // 如果跳过了，确保所有字母都显示
-    if (state.memory._skipAnimation) {
-      container.innerHTML = word.split('').map(c =>
-        `<span class="mc-letter visible">${c}</span>`
-      ).join('');
+      await sleep(perLetterMs);
     }
 
     // 等待基础时间（也可跳过）
-    if (!state.memory._skipAnimation) {
+    if (!skipControl.skipped) {
       await sleep(state.memory.baseMs);
     }
   } finally {
-    // 确保移除点击处理器和提示（即使发生错误）
-    $('memory-card').removeEventListener('click', skipHandler);
+    // 确保移除点击处理器和提示
+    document.removeEventListener('click', skipHandler, true);
     if (hint.parentNode) hint.remove();
   }
 }
@@ -3361,24 +3364,16 @@ async function retryWrongWords() {
   const wrongWords = [...m.wrongWords];
   m.wrongWords = [];
 
-  // 创建一个临时"例句"只包含错误单词
-  const tempSentence = {
-    node: null,
-    words: wrongWords,
-    translation: '',
-    sentenceText: '',
-  };
-
   // 替换当前句子的单词列表
   const origSentence = m.sentences[m.sentenceIndex];
   const origWords = [...origSentence.words];
 
   // 用错误单词替换
   m.sentences[m.sentenceIndex].words = wrongWords;
-  m.wordIndex = 0;
 
   // 逐个揭示错误单词
-  for (const word of wrongWords) {
+  for (let idx = 0; idx < wrongWords.length; idx++) {
+    const word = wrongWords[idx];
     const wordNode = state.cy.getElementById('word:' + word);
     const defCn = wordNode.length ? (wordNode.data('definition_cn') || '') : '';
     const defEn = wordNode.length ? (wordNode.data('definition_en') || '') : '';
@@ -3395,34 +3390,37 @@ async function retryWrongWords() {
       state.cy.animate({ center: { eles: wordNode }, zoom: 1.2 }, { duration: 300 });
     }
 
-    m.phase = 'revealing';
+    // 确保卡片显示正面
     $('memory-card-overlay').classList.remove('hidden');
     $('memory-card').classList.remove('flipped');
-    $('mc-progress').textContent = `重新记忆错误单词`;
+    $('mc-progress').textContent = `重新记忆错误单词 (${idx + 1}/${wrongWords.length})`;
 
-    // 清空字母容器，防止残留
-    $('mc-letters').innerHTML = '';
+    // 设置状态为 revealing
+    m.phase = 'revealing';
 
+    // 揭示字母
     await revealLetters(word);
 
+    // 翻转卡片显示释义
     m.phase = 'showing';
     $('memory-card').classList.add('flipped');
     showCardBack(m.currentCard);
 
-    // 等待用户点击"下一个"
+    // 等待用户点击"下一个"（使用 Promise 包装 mc-next 的点击事件）
     await new Promise(resolve => {
       const checkInterval = setInterval(() => {
+        // 只有当 phase 从 showing 变为其他状态时才继续
         if (m.phase !== 'showing') {
           clearInterval(checkInterval);
           resolve();
         }
-      }, 100);
+      }, 50);
     });
   }
 
   // 恢复原始单词列表，重新归位
   m.sentences[m.sentenceIndex].words = origWords;
-  m.wordIndex = origWords.length; // 跳过揭示阶段，直接进入归位
+  m.wordIndex = origWords.length;
   await placementPhase();
 }
 
