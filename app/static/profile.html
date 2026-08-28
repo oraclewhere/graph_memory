@@ -249,6 +249,33 @@
 
     <div class="status" id="status"></div>
   </div>
+
+  <!-- 记忆模式动画配置卡片 -->
+  <div class="card">
+    <h2>记忆模式动画配置</h2>
+    <p style="font-size: 13px; color: var(--ink-3); margin: -8px 0 20px;">
+      控制记忆模式下卡片逐字母揭示的动画速度
+    </p>
+
+    <div class="form-group">
+      <label>基础时间（毫秒）</label>
+      <input type="number" id="memory-base-ms" min="500" max="3000" step="100" placeholder="1500">
+      <div class="hint">所有字母显示完毕后到卡片翻转的等待时间，默认 1500ms，范围 500-3000</div>
+    </div>
+
+    <div class="form-group">
+      <label>每字母增量（毫秒）</label>
+      <input type="number" id="memory-per-letter-ms" min="50" max="500" step="50" placeholder="200">
+      <div class="hint">每个字母逐个出现的间隔时间，默认 200ms，范围 50-500<br>例如 5 字母词：基础 1500ms + 5×200ms = 2500ms 后翻转</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="primary" id="btn-save-memory" onclick="saveMemoryConfig()">保存配置</button>
+      <button class="secondary" onclick="loadProfile()">重新加载</button>
+    </div>
+
+    <div class="status" id="memory-status"></div>
+  </div>
 </div>
 
 <script>
@@ -275,9 +302,9 @@ async function apiFetch(url, options = {}) {
   return res;
 }
 
-// 显示状态消息
-function showStatus(message, isError = false) {
-  const status = document.getElementById("status");
+// 显示状态消息（支持自定义元素 ID）
+function showStatus(message, isError = false, elementId = "status") {
+  const status = document.getElementById(elementId);
   status.textContent = message;
   status.className = "status " + (isError ? "error" : "success");
   setTimeout(() => {
@@ -315,12 +342,16 @@ async function loadProfile() {
     document.getElementById("llm-api-key").value = user.llm_api_key || "";
     document.getElementById("llm-model").value = user.llm_model || "";
 
+    // 记忆模式动画配置
+    document.getElementById("memory-base-ms").value = user.memory_base_ms || 1500;
+    document.getElementById("memory-per-letter-ms").value = user.memory_per_letter_ms || 200;
+
   } catch (err) {
     showStatus("加载失败: " + err.message, true);
   }
 }
 
-// 保存配置
+// 保存 LLM 配置
 async function saveProfile() {
   const btn = document.getElementById("btn-save");
   btn.disabled = true;
@@ -331,6 +362,8 @@ async function saveProfile() {
       llm_api_base: document.getElementById("llm-api-base").value.trim(),
       llm_api_key: document.getElementById("llm-api-key").value.trim(),
       llm_model: document.getElementById("llm-model").value.trim(),
+      memory_base_ms: parseInt(document.getElementById("memory-base-ms").value) || 1500,
+      memory_per_letter_ms: parseInt(document.getElementById("memory-per-letter-ms").value) || 200,
     };
 
     const res = await apiFetch("/api/user/profile", {
@@ -344,6 +377,45 @@ async function saveProfile() {
     showStatus("配置已保存");
   } catch (err) {
     showStatus("保存失败: " + err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "保存配置";
+  }
+}
+
+// 保存记忆模式动画配置
+async function saveMemoryConfig() {
+  const btn = document.getElementById("btn-save-memory");
+  btn.disabled = true;
+  btn.textContent = "保存中...";
+
+  try {
+    const baseMs = Math.max(500, Math.min(3000, parseInt(document.getElementById("memory-base-ms").value) || 1500));
+    const perLetterMs = Math.max(50, Math.min(500, parseInt(document.getElementById("memory-per-letter-ms").value) || 200));
+
+    const data = {
+      llm_api_base: document.getElementById("llm-api-base").value.trim(),
+      llm_api_key: document.getElementById("llm-api-key").value.trim(),
+      llm_model: document.getElementById("llm-model").value.trim(),
+      memory_base_ms: baseMs,
+      memory_per_letter_ms: perLetterMs,
+    };
+
+    const res = await apiFetch("/api/user/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) throw new Error("保存失败");
+    await res.json();
+
+    // 更新输入框为实际保存值
+    document.getElementById("memory-base-ms").value = baseMs;
+    document.getElementById("memory-per-letter-ms").value = perLetterMs;
+
+    showStatus("记忆模式配置已保存", false, "memory-status");
+  } catch (err) {
+    showStatus("保存失败: " + err.message, true, "memory-status");
   } finally {
     btn.disabled = false;
     btn.textContent = "保存配置";

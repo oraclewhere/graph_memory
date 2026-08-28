@@ -24,6 +24,10 @@ class User(Base):
     llm_api_key = Column(String(500), nullable=True)
     llm_model = Column(String(100), nullable=True)
 
+    # 记忆模式动画配置
+    memory_base_ms = Column(Integer, default=1500, nullable=True)
+    memory_per_letter_ms = Column(Integer, default=200, nullable=True)
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
@@ -33,4 +37,6 @@ class User(Base):
             "llm_api_base": self.llm_api_base or "",
             "llm_api_key": self.llm_api_key or "",
             "llm_model": self.llm_model or "",
+            "memory_base_ms": self.memory_base_ms if self.memory_base_ms is not None else 1500,
+            "memory_per_letter_ms": self.memory_per_letter_ms if self.memory_per_letter_ms is not None else 200,
         }

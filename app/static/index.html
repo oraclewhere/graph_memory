@@ -375,6 +375,396 @@
     font-size: 12px; color: var(--ink-2); cursor: pointer;
   }
   #review-layout-bar input { accent-color: var(--blue-dim); margin: 0; }
+
+  /* ==================== 记忆模式样式 ==================== */
+  #memory-topbar {
+    position: absolute;
+    top: 72px;
+    left: 14px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    pointer-events: none;
+  }
+  #memory-topbar h1 { font-size: 15px; font-weight: 600; margin: 0; color: var(--ink); }
+  #memory-topbar .hint { font-size: 12px; color: var(--ink-3); }
+  #memory-topbar .back {
+    pointer-events: auto;
+    font-size: 13px;
+    color: var(--ink-2);
+    text-decoration: none;
+    padding: 4px 10px;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    background: var(--panel);
+  }
+  #memory-topbar .back:hover { color: var(--ink); border-color: var(--blue-dim); }
+
+  #memory-layout-bar {
+    position: absolute; top: 72px; right: 14px; z-index: 12;
+    display: flex; flex-direction: column; gap: 6px;
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  #memory-layout-bar .lb-title { font-size: 11px; color: var(--ink-3); }
+  #memory-layout-bar label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--ink-2); cursor: pointer;
+  }
+  #memory-layout-bar input { accent-color: var(--blue-dim); margin: 0; }
+
+  /* 记忆卡片翻转容器 */
+  #memory-card-overlay {
+    position: fixed; inset: 0;
+    z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6);
+  }
+  #memory-card-overlay.hidden { display: none; }
+
+  #memory-card {
+    width: 440px;
+    max-width: 90vw;
+    height: 340px;
+    perspective: 1200px;
+  }
+  #memory-card .card-inner {
+    position: relative; width: 100%; height: 100%;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d;
+  }
+  #memory-card.flipped .card-inner {
+    transform: rotateY(180deg);
+  }
+  .card-face {
+    position: absolute; width: 100%; height: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .card-back {
+    transform: rotateY(180deg);
+  }
+
+  /* 卡片正面：逐字母揭示 */
+  #mc-letters {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-bottom: 20px;
+    min-height: 50px;
+  }
+  .mc-letter {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--ink);
+    font-family: 'Courier New', monospace;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .mc-letter.visible {
+    opacity: 1;
+  }
+  #mc-progress {
+    font-size: 13px;
+    color: var(--ink-3);
+    margin-bottom: 16px;
+  }
+
+  /* 卡片背面：释义 + 例句 */
+  #mc-word {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--blue-bright);
+    margin-bottom: 8px;
+  }
+  #mc-def-cn {
+    font-size: 18px;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  #mc-def-en {
+    font-size: 13px;
+    color: var(--ink-3);
+    margin-bottom: 16px;
+  }
+  #mc-sentence {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.6;
+    text-align: center;
+    margin-bottom: 4px;
+    max-width: 100%;
+    word-break: break-word;
+  }
+  #mc-translation {
+    font-size: 13px;
+    color: var(--ink-3);
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  #mc-next {
+    padding: 10px 32px;
+    font-size: 15px;
+    font-weight: 600;
+    background: var(--blue-dim);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #mc-next:hover { background: #2f7ad4; }
+
+  /* 归位面板 */
+  #memory-placement-overlay {
+    position: fixed; inset: 0;
+    z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6);
+  }
+  #memory-placement-overlay.hidden { display: none; }
+
+  #memory-placement-card {
+    width: 500px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  #mp-header {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  #mp-content {
+    margin-bottom: 16px;
+  }
+  #mp-feedback {
+    font-size: 14px;
+    min-height: 20px;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  #mp-feedback.ok { color: var(--good); }
+  #mp-feedback.err { color: var(--critical); }
+  #mp-submit {
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    background: var(--blue-dim);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #mp-submit:hover { background: #2f7ad4; }
+
+  /* 归位模式 - match: 匹配释义（列式布局） */
+  .mp-match-layout {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .mp-match-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .mp-match-arrows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+    padding: 0 8px;
+  }
+  .mp-match-arrows > div {
+    color: var(--ink-3);
+    font-size: 16px;
+    text-align: center;
+    height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .mp-match-def, .mp-match-word {
+    padding: 10px 14px;
+    font-size: 14px;
+    background: #141414;
+    color: var(--ink);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+  }
+  .mp-match-def {
+    color: var(--ink-2);
+  }
+  .mp-match-def:hover, .mp-match-word:hover {
+    border-color: var(--blue-bright);
+  }
+  .mp-match-def.selected {
+    border-color: var(--blue-dim);
+    background: rgba(57,135,229,0.15);
+    color: var(--ink);
+  }
+  .mp-match-def.assigned, .mp-match-word.assigned {
+    border-color: var(--blue-bright);
+    background: rgba(57,135,229,0.1);
+  }
+  .mp-match-def.correct, .mp-match-word.correct {
+    border-color: var(--good);
+    color: var(--good);
+    background: rgba(12,163,12,0.1);
+  }
+  .mp-match-def.wrong, .mp-match-word.wrong {
+    border-color: var(--critical);
+    color: var(--critical);
+    background: rgba(230,103,103,0.1);
+  }
+
+  /* 归位模式 - fill: 填入句中 */
+  .mp-fill-sentence {
+    font-size: 18px;
+    line-height: 2.2;
+    color: var(--ink);
+    margin-bottom: 16px;
+  }
+  .mp-fill-blank {
+    display: inline-block;
+    min-width: 60px;
+    padding: 2px 8px;
+    border-bottom: 2px solid var(--blue-bright);
+    color: var(--blue-bright);
+    font-weight: 600;
+    text-align: center;
+    margin: 0 2px;
+  }
+  .mp-fill-blank input {
+    width: 100%;
+    padding: 2px 4px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--blue-bright);
+    color: var(--ink);
+    font-size: 16px;
+    text-align: center;
+    outline: none;
+  }
+  .mp-fill-blank input.correct { border-bottom-color: var(--good); color: var(--good); }
+  .mp-fill-blank input.wrong { border-bottom-color: var(--critical); color: var(--critical); }
+  .mp-fill-candidates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .mp-fill-candidate {
+    padding: 6px 14px;
+    font-size: 14px;
+    background: #141414;
+    color: var(--ink);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .mp-fill-candidate:hover { border-color: var(--blue-bright); }
+  .mp-fill-candidate.used { opacity: 0.4; cursor: not-allowed; }
+
+  /* 归位模式 - select: 释义选词 */
+  .mp-select-definition {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ink);
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .mp-select-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .mp-select-option {
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    background: #141414;
+    color: var(--ink);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .mp-select-option:hover { border-color: var(--blue-bright); }
+  .mp-select-option.selected { border-color: var(--blue-dim); background: rgba(57,135,229,0.15); }
+  .mp-select-option.correct { border-color: var(--good); color: var(--good); }
+  .mp-select-option.wrong { border-color: var(--critical); color: var(--critical); }
+  .mp-select-progress {
+    font-size: 13px;
+    color: var(--ink-3);
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  /* 完成面板 */
+  #memory-done-overlay {
+    position: fixed; inset: 0;
+    z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6);
+  }
+  #memory-done-overlay.hidden { display: none; }
+
+  #memory-done-card {
+    width: 400px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  #md-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--blue-bright);
+    margin-bottom: 20px;
+  }
+  #md-stats {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 2;
+    margin-bottom: 24px;
+  }
+  #md-back {
+    padding: 10px 32px;
+    font-size: 15px;
+    font-weight: 600;
+    background: var(--blue-dim);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #md-back:hover { background: #2f7ad4; }
   #layout-bar {
     position: absolute; top: 72px; right: 14px; z-index: 12;
     display: flex; flex-direction: column; gap: 6px;
@@ -501,6 +891,7 @@
 <div id="mode-tabs">
   <button class="mode-tab active" data-mode="explore">探索模式</button>
   <button class="mode-tab" data-mode="review">复习模式</button>
+  <button class="mode-tab" data-mode="memory">记忆模式</button>
 </div>
 
 <div id="cy"></div>
@@ -604,6 +995,63 @@
   </div>
 </div>
 
+<!-- ==================== 记忆模式容器 ==================== -->
+<div id="memory-view" class="hidden">
+  <div id="memory-topbar">
+    <a class="back" href="/">← 笔记列表</a>
+    <h1 id="memory-title">graph_memory</h1>
+    <span class="hint">点击单词或例句节点开始记忆 · 逐个揭示字母 → 翻转看释义</span>
+  </div>
+
+  <div id="memory-layout-bar">
+    <span class="lb-title">归位模式</span>
+    <label><input type="radio" name="memory-placement" value="match" checked> 匹配释义</label>
+    <label><input type="radio" name="memory-placement" value="fill"> 填入句中</label>
+    <label><input type="radio" name="memory-placement" value="select"> 释义选词</label>
+  </div>
+
+  <!-- 记忆卡片容器 -->
+  <div id="memory-card-overlay" class="hidden">
+    <div id="memory-card">
+      <div class="card-inner">
+        <!-- 正面：逐字母揭示 -->
+        <div class="card-face card-front" id="mc-front">
+          <div id="mc-letters"></div>
+          <div id="mc-progress"></div>
+        </div>
+        <!-- 背面：释义 + 例句 -->
+        <div class="card-face card-back" id="mc-back">
+          <div id="mc-word"></div>
+          <div id="mc-def-cn"></div>
+          <div id="mc-def-en"></div>
+          <div id="mc-sentence"></div>
+          <div id="mc-translation"></div>
+          <button id="mc-next">下一个 →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 卡片归位面板 -->
+  <div id="memory-placement-overlay" class="hidden">
+    <div id="memory-placement-card">
+      <div id="mp-header"></div>
+      <div id="mp-content"></div>
+      <div id="mp-feedback"></div>
+      <button id="mp-submit">提交</button>
+    </div>
+  </div>
+
+  <!-- 记忆完成面板 -->
+  <div id="memory-done-overlay" class="hidden">
+    <div id="memory-done-card">
+      <div id="md-title">记忆完成！</div>
+      <div id="md-stats"></div>
+      <button id="md-back">返回图</button>
+    </div>
+  </div>
+</div>
+
 <div id="grow-modal" class="hidden">
   <div class="grow-card">
     <div class="grow-title" id="grow-title">是否增加新的单词？</div>
@@ -674,6 +1122,9 @@ function memColor(m) {
 }
 
 const state = { cy: null, current: null, pending: null, pendingAnswer: '', unfollowPanel: null,
+  // 模式状态
+  currentMode: 'explore',  // 'explore' | 'review' | 'memory'
+
   // 复习模式状态
   reviewMode: false,
   reviewQueue: [],
@@ -685,6 +1136,22 @@ const state = { cy: null, current: null, pending: null, pendingAnswer: '', unfol
   currentReviewWord: null,
   currentSentenceReview: null,
   reviewStats: { correct: 0, wrong: 0, sentencesCompleted: 0 },
+
+  // 记忆模式状态
+  memory: {
+    sentences: [],              // [{ node, words: [...], translation, sentenceText }]
+    sentenceIndex: 0,
+    wordIndex: 0,
+    wrongWords: [],             // 归位错误的单词，需重新记忆
+    baseMs: 1500,
+    perLetterMs: 200,
+    phase: 'idle',              // idle | revealing | showing | placement | done
+    currentCard: null,
+    placementMode: 'match',     // match | fill | select
+    placementResults: {},
+    stats: { total: 0, correct: 0, wrong: 0, rounds: 0 },
+    memoryCardNode: null,       // 启动记忆流程时点击的节点
+  },
 };
 const $ = (id) => document.getElementById(id);
 
@@ -870,8 +1337,19 @@ function buildCy(data) {
 function onNodeTap(evt) {
   const node = evt.target;
   const label = node.data('label');
-  if (label === 'Word') openQuiz(node);
-  else if (label === 'Sentence') openSentencePanel(node);
+
+  if (state.currentMode === 'memory') {
+    // 记忆模式：点击单词或例句节点启动记忆流程
+    if (label === 'Word' || label === 'Sentence') {
+      startMemoryFlow(node);
+    }
+  } else if (state.currentMode === 'review') {
+    // 复习模式不处理节点点击
+  } else {
+    // 探索模式原有逻辑
+    if (label === 'Word') openQuiz(node);
+    else if (label === 'Sentence') openSentencePanel(node);
+  }
 }
 
 // 边 hover：显示 tooltip（词缀含义）
@@ -973,6 +1451,20 @@ function handleEscape() {
   if (!$('modal').classList.contains('hidden')) {
     $('modal').classList.add('hidden');
     state.pending = null;
+  }
+  // 记忆模式：关闭卡片和归位面板
+  if (!$('memory-card-overlay').classList.contains('hidden')) {
+    $('memory-card-overlay').classList.add('hidden');
+    state.memory.phase = 'idle';
+    return;
+  }
+  if (!$('memory-placement-overlay').classList.contains('hidden')) {
+    $('memory-placement-overlay').classList.add('hidden');
+    return;
+  }
+  if (!$('memory-done-overlay').classList.contains('hidden')) {
+    $('memory-done-overlay').classList.add('hidden');
+    return;
   }
   closeQuiz();
   closeSentencePanel();
@@ -1440,10 +1932,12 @@ $('quiz-add').onclick = () => {
   if (state.current) openGrowModal(state.current.data('text'));
 };
 
-// 增词需要明确的分类（写库要落到某个 Category），整图视图下不提供
+// 增词和记忆模式需要明确的分类，整图视图下不提供
 if (!CATEGORY) {
   $('grow-btn').style.display = 'none';
   $('quiz-add').style.display = 'none';
+  // 隐藏记忆模式 tab（记忆模式需要分类来组织例句）
+  document.querySelector('.mode-tab[data-mode="memory"]').style.display = 'none';
 }
 
 $('quiz-submit').onclick = submitAnswer;
@@ -1993,29 +2487,45 @@ async function submitReviewAnswer() {
 
 // 模式切换
 function switchMode(mode) {
+  state.currentMode = mode;
   state.reviewMode = (mode === 'review');
 
-  // 切换模式容器
-  $('explore-view').classList.toggle('hidden', state.reviewMode);
-  $('review-view').classList.toggle('hidden', !state.reviewMode);
+  // 切换三个模式容器
+  $('explore-view').classList.toggle('hidden', mode !== 'explore');
+  $('review-view').classList.toggle('hidden', mode !== 'review');
+  $('memory-view').classList.toggle('hidden', mode !== 'memory');
 
   document.querySelectorAll('.mode-tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.mode === mode);
   });
 
-  // 关闭探索模式面板
+  // 关闭所有面板
+  closeAllPanels();
+
+  // 模式初始化
+  if (mode === 'review') {
+    if (state.cy) initializeReviewMode();
+  } else if (mode === 'memory') {
+    if (state.cy) initializeMemoryMode();
+  } else {
+    if (state.cy) {
+      state.cy.elements().removeClass('dimmed').removeClass('highlighted').removeClass('review-highlight').removeClass('memory-highlight');
+    }
+  }
+}
+
+// 关闭所有模式的面板
+function closeAllPanels() {
   if (typeof closeQuiz === 'function') closeQuiz();
   if (typeof closeSentencePanel === 'function') closeSentencePanel();
   $('sentence-review-panel').classList.add('hidden');
   state.currentSentenceReview = null;
-
-  if (state.reviewMode) {
-    if (state.cy) initializeReviewMode();
-  } else {
-    if (state.cy) {
-      state.cy.elements().removeClass('dimmed').removeClass('highlighted').removeClass('review-highlight');
-    }
-  }
+  // 记忆模式面板
+  $('memory-card-overlay').classList.add('hidden');
+  $('memory-placement-overlay').classList.add('hidden');
+  $('memory-done-overlay').classList.add('hidden');
+  state.memory.phase = 'idle';
+  state.memory.currentCard = null;
 }
 
 // 绑定 Tab 点击事件
@@ -2031,6 +2541,830 @@ $('sentence-review-close').addEventListener('click', () => {
 
 // 例句复习提交按钮
 $('sr-submit').addEventListener('click', submitSentenceReview);
+
+// ===================== 记忆模式 =====================
+
+// 工具函数：延迟
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// 加载记忆模式动画配置
+async function loadMemoryConfig() {
+  try {
+    const res = await apiFetch('/api/user/profile');
+    if (res) {
+      const data = await res.json();
+      state.memory.baseMs = data.user.memory_base_ms || 1500;
+      state.memory.perLetterMs = data.user.memory_per_letter_ms || 200;
+    }
+  } catch (e) {
+    // 使用默认值
+  }
+}
+
+// 初始化记忆模式
+function initializeMemoryMode() {
+  loadMemoryConfig();
+  state.memory.sentences = [];
+  state.memory.sentenceIndex = 0;
+  state.memory.wordIndex = 0;
+  state.memory.wrongWords = [];
+  state.memory.phase = 'idle';
+  state.memory.currentCard = null;
+  state.memory.placementResults = {};
+  state.memory.stats = { total: 0, correct: 0, wrong: 0, rounds: 0 };
+
+  // 读取归位模式
+  const checked = document.querySelector('input[name="memory-placement"]:checked');
+  state.memory.placementMode = checked ? checked.value : 'match';
+}
+
+// 记忆模式归位选项切换
+document.querySelectorAll('input[name="memory-placement"]').forEach(el => {
+  el.addEventListener('change', () => {
+    if (el.checked) state.memory.placementMode = el.value;
+  });
+});
+
+// 启动记忆流程
+async function startMemoryFlow(node) {
+  if (state.memory.phase !== 'idle') return;
+
+  // 重置状态
+  state.memory.wrongWords = [];
+  state.memory.stats = { total: 0, correct: 0, wrong: 0, rounds: 0 };
+
+  // 构建例句队列
+  await buildMemorySentences(node);
+
+  if (state.memory.sentences.length === 0) return;
+
+  state.memory.sentenceIndex = 0;
+  state.memory.wordIndex = 0;
+
+  // 开始第一个单词的揭示
+  await revealPhase();
+}
+
+// 构建例句队列
+async function buildMemorySentences(startNode) {
+  const sentences = [];
+  const seenSentences = new Set();
+
+  if (startNode.data('label') === 'Sentence') {
+    // 点击例句节点：直接使用该例句
+    const words = startNode.data('words') || [];
+    if (words.length > 0) {
+      sentences.push({
+        node: startNode,
+        words: [...words],
+        translation: startNode.data('translation') || '',
+        sentenceText: startNode.data('text') || '',
+      });
+    }
+  } else if (startNode.data('label') === 'Word') {
+    // 点击单词节点：找到包含该词的所有例句
+    const wordText = startNode.data('text');
+    state.cy.nodes('[label="Sentence"]').forEach(sNode => {
+      const words = sNode.data('words') || [];
+      if (words.includes(wordText) && !seenSentences.has(sNode.id())) {
+        seenSentences.add(sNode.id());
+        sentences.push({
+          node: sNode,
+          words: [...words],
+          translation: sNode.data('translation') || '',
+          sentenceText: sNode.data('text') || '',
+        });
+      }
+    });
+  }
+
+  state.memory.sentences = sentences;
+}
+
+// 揭示阶段：逐字母显示，然后翻转
+async function revealPhase() {
+  const m = state.memory;
+  const sentence = m.sentences[m.sentenceIndex];
+  if (!sentence) {
+    showMemoryDone();
+    return;
+  }
+
+  const words = sentence.words;
+  if (m.wordIndex >= words.length) {
+    // 该例句所有单词过完，进入归位阶段
+    await placementPhase();
+    return;
+  }
+
+  const wordText = words[m.wordIndex];
+  const wordNode = state.cy.getElementById('word:' + wordText);
+  const defCn = wordNode.length ? (wordNode.data('definition_cn') || '') : '';
+  const defEn = wordNode.length ? (wordNode.data('definition_en') || '') : '';
+
+  m.currentCard = {
+    word: wordText,
+    defCn, defEn,
+    sentenceText: sentence.sentenceText,
+    translation: sentence.translation,
+    node: wordNode,
+  };
+
+  // 高亮当前单词节点
+  if (state.cy) {
+    state.cy.elements().removeClass('memory-highlight');
+    if (wordNode.length) {
+      wordNode.addClass('memory-highlight');
+      state.cy.animate({ center: { eles: wordNode }, zoom: 1.2 }, { duration: 300 });
+    }
+  }
+
+  // 显示卡片正面
+  m.phase = 'revealing';
+  $('memory-card-overlay').classList.remove('hidden');
+  $('memory-card').classList.remove('flipped');
+
+  // 更新进度
+  $('mc-progress').textContent = `例句 ${m.sentenceIndex + 1}/${m.sentences.length} · 单词 ${m.wordIndex + 1}/${words.length}`;
+
+  // 逐字母揭示
+  await revealLetters(wordText);
+
+  // 翻转卡片
+  m.phase = 'showing';
+  $('memory-card').classList.add('flipped');
+  showCardBack(m.currentCard);
+}
+
+// 逐字母揭示动画
+async function revealLetters(word) {
+  const container = $('mc-letters');
+  container.innerHTML = '';
+  const perLetterMs = state.memory.perLetterMs;
+
+  for (let i = 0; i < word.length; i++) {
+    const span = document.createElement('span');
+    span.className = 'mc-letter';
+    span.textContent = word[i];
+    container.appendChild(span);
+
+    // 强制重绘后添加可见类
+    void span.offsetWidth;
+    span.classList.add('visible');
+
+    await sleep(perLetterMs);
+  }
+
+  // 所有字母显示完后等待基础时间
+  await sleep(state.memory.baseMs);
+}
+
+// 显示卡片背面内容
+function showCardBack(card) {
+  $('mc-word').textContent = card.word;
+  $('mc-def-cn').textContent = card.defCn || '（暂无中文释义）';
+  $('mc-def-en').textContent = card.defEn || '';
+  $('mc-sentence').textContent = card.sentenceText || '';
+  $('mc-translation').textContent = card.translation || '';
+}
+
+// "下一个"按钮
+$('mc-next').addEventListener('click', async () => {
+  if (state.memory.phase !== 'showing') return;
+
+  state.memory.stats.total++;
+
+  // 关闭卡片
+  $('memory-card').classList.remove('flipped');
+  await sleep(300); // 等待翻转动画
+  $('memory-card-overlay').classList.add('hidden');
+  state.memory.phase = 'idle';
+
+  // 跳到下一个单词
+  state.memory.wordIndex++;
+  await revealPhase();
+});
+
+// 归位阶段
+async function placementPhase() {
+  const m = state.memory;
+  const sentence = m.sentences[m.sentenceIndex];
+  if (!sentence) {
+    showMemoryDone();
+    return;
+  }
+
+  m.phase = 'placement';
+  m.placementResults = {};
+
+  const words = sentence.words;
+
+  // 根据模式显示/隐藏提交按钮
+  $('mp-submit').style.display = (m.placementMode === 'select') ? 'none' : 'block';
+
+  switch (m.placementMode) {
+    case 'match': renderMatchPlacement(words, sentence); break;
+    case 'fill': renderFillPlacement(words, sentence); break;
+    case 'select': renderSelectPlacement(words, sentence); break;
+  }
+
+  $('memory-placement-overlay').classList.remove('hidden');
+}
+
+// ========== 归位模式：匹配释义 ==========
+function renderMatchPlacement(words, sentence) {
+  $('mp-header').textContent = `匹配释义 · 例句 ${state.memory.sentenceIndex + 1}/${state.memory.sentences.length}`;
+
+  const content = $('mp-content');
+  content.innerHTML = '';
+
+  // 获取每个单词的释义
+  const wordInfos = words.map(w => {
+    const node = state.cy.getElementById('word:' + w);
+    return {
+      word: w,
+      defCn: node.length ? (node.data('definition_cn') || w) : w,
+    };
+  });
+
+  // 打乱单词顺序作为候选
+  const shuffledWords = [...words];
+  shuffleArray(shuffledWords);
+
+  // 存储匹配状态
+  state.memory._matchAssignments = {};
+  state.memory._selectedDefinition = null;
+
+  // 创建布局容器
+  const layout = document.createElement('div');
+  layout.className = 'mp-match-layout';
+
+  // 左侧：定义列表
+  const defColumn = document.createElement('div');
+  defColumn.className = 'mp-match-column';
+
+  wordInfos.forEach((info, i) => {
+    const defCard = document.createElement('div');
+    defCard.className = 'mp-match-def';
+    defCard.textContent = info.defCn;
+    defCard.dataset.word = info.word;
+
+    defCard.addEventListener('click', () => {
+      // 如果已有选中的定义，取消选择
+      if (state.memory._selectedDefinition === info.word) {
+        state.memory._selectedDefinition = null;
+        defCard.classList.remove('selected');
+        return;
+      }
+
+      // 取消其他定义的选择
+      defColumn.querySelectorAll('.mp-match-def').forEach(d => d.classList.remove('selected'));
+
+      // 选中这个定义
+      state.memory._selectedDefinition = info.word;
+      defCard.classList.add('selected');
+    });
+
+    defColumn.appendChild(defCard);
+  });
+
+  layout.appendChild(defColumn);
+
+  // 箭头
+  const arrowCol = document.createElement('div');
+  arrowCol.className = 'mp-match-arrows';
+  wordInfos.forEach(() => {
+    const arrow = document.createElement('div');
+    arrow.textContent = '→';
+    arrowCol.appendChild(arrow);
+  });
+  layout.appendChild(arrowCol);
+
+  // 右侧：单词列表
+  const wordColumn = document.createElement('div');
+  wordColumn.className = 'mp-match-column';
+
+  shuffledWords.forEach(w => {
+    const wordCard = document.createElement('div');
+    wordCard.className = 'mp-match-word';
+    wordCard.textContent = w;
+    wordCard.dataset.word = w;
+
+    wordCard.addEventListener('click', () => {
+      const selectedDef = state.memory._selectedDefinition;
+      if (!selectedDef) {
+        $('mp-feedback').textContent = '请先点击左侧的中文释义';
+        $('mp-feedback').className = 'err';
+        setTimeout(() => {
+          $('mp-feedback').textContent = '';
+        }, 1500);
+        return;
+      }
+
+      // 如果这个单词已经被分配给其他定义，先取消
+      const existingDef = Object.entries(state.memory._matchAssignments)
+        .find(([_, word]) => word === w);
+      if (existingDef) {
+        delete state.memory._matchAssignments[existingDef[0]];
+        // 更新 UI
+        defColumn.querySelectorAll('.mp-match-def').forEach(d => {
+          if (d.dataset.word === existingDef[0]) {
+            d.classList.remove('assigned');
+          }
+        });
+      }
+
+      // 如果这个定义已经有分配，先取消
+      if (state.memory._matchAssignments[selectedDef]) {
+        const oldWord = state.memory._matchAssignments[selectedDef];
+        wordColumn.querySelectorAll('.mp-match-word').forEach(wc => {
+          if (wc.dataset.word === oldWord) {
+            wc.classList.remove('assigned');
+          }
+        });
+      }
+
+      // 建立匹配
+      state.memory._matchAssignments[selectedDef] = w;
+      wordCard.classList.add('assigned');
+
+      // 更新定义卡片状态
+      defColumn.querySelectorAll('.mp-match-def').forEach(d => {
+        if (d.dataset.word === selectedDef) {
+          d.classList.add('assigned');
+          d.classList.remove('selected');
+        }
+      });
+
+      state.memory._selectedDefinition = null;
+    });
+
+    wordColumn.appendChild(wordCard);
+  });
+
+  layout.appendChild(wordColumn);
+  content.appendChild(layout);
+}
+
+// ========== 归位模式：填入句中 ==========
+function renderFillPlacement(words, sentence) {
+  $('mp-header').textContent = `填入句中 · 例句 ${state.memory.sentenceIndex + 1}/${state.memory.sentences.length}`;
+
+  const content = $('mp-content');
+  content.innerHTML = '';
+
+  const sentenceText = sentence.sentenceText;
+  const wordSet = new Set(words.map(w => w.toLowerCase()));
+
+  // 分词并替换单词为输入框
+  const tokens = tokenizeSentence(sentenceText);
+  const sentenceDiv = document.createElement('div');
+  sentenceDiv.className = 'mp-fill-sentence';
+
+  let blankIdx = 0;
+  const blanks = [];
+
+  tokens.forEach(t => {
+    if (t.type === 'word' && wordSet.has(t.value)) {
+      blankIdx++;
+      const blank = document.createElement('span');
+      blank.className = 'mp-fill-blank';
+      blank.dataset.answer = t.value;
+      blank.dataset.index = blankIdx;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = '[' + blankIdx + ']';
+      input.autocomplete = 'off';
+      blank.appendChild(input);
+      blanks.push({ input, answer: t.value });
+
+      sentenceDiv.appendChild(blank);
+    } else {
+      sentenceDiv.appendChild(document.createTextNode(t.original || t.value));
+    }
+  });
+
+  content.appendChild(sentenceDiv);
+
+  // 候选词
+  const candidatesDiv = document.createElement('div');
+  candidatesDiv.className = 'mp-fill-candidates';
+
+  const shuffledWords = [...words];
+  shuffleArray(shuffledWords);
+
+  shuffledWords.forEach(w => {
+    const chip = document.createElement('span');
+    chip.className = 'mp-fill-candidate';
+    chip.textContent = w;
+    chip.addEventListener('click', () => {
+      // 找到第一个空输入框
+      const emptyInput = blanks.find(b => !b.input.value);
+      if (emptyInput && !chip.classList.contains('used')) {
+        emptyInput.input.value = w;
+        chip.classList.add('used');
+      }
+    });
+    candidatesDiv.appendChild(chip);
+  });
+
+  content.appendChild(candidatesDiv);
+
+  // 存储 blanks 供提交时使用
+  state.memory._fillBlanks = blanks;
+  state.memory._fillCandidates = candidatesDiv;
+}
+
+// ========== 归位模式：释义选词 ==========
+function renderSelectPlacement(words, sentence) {
+  $('mp-header').textContent = `释义选词 · 例句 ${state.memory.sentenceIndex + 1}/${state.memory.sentences.length}`;
+
+  const content = $('mp-content');
+  content.innerHTML = '';
+
+  const wordInfos = words.map(w => {
+    const node = state.cy.getElementById('word:' + w);
+    return {
+      word: w,
+      defCn: node.length ? (node.data('definition_cn') || w) : w,
+    };
+  });
+
+  state.memory._selectWords = wordInfos;
+  state.memory._selectIndex = 0;
+  state.memory._selectAnswers = {};
+
+  renderSelectQuestion();
+}
+
+function renderSelectQuestion() {
+  const m = state.memory;
+  const wordInfos = m._selectWords;
+  const idx = m._selectIndex;
+
+  if (idx >= wordInfos.length) {
+    // 全部选完
+    checkSelectResults();
+    return;
+  }
+
+  const content = $('mp-content');
+  content.innerHTML = '';
+
+  const current = wordInfos[idx];
+
+  // 进度
+  const progress = document.createElement('div');
+  progress.className = 'mp-select-progress';
+  progress.textContent = `${idx + 1} / ${wordInfos.length}`;
+  content.appendChild(progress);
+
+  // 释义
+  const def = document.createElement('div');
+  def.className = 'mp-select-definition';
+  def.textContent = current.defCn;
+  content.appendChild(def);
+
+  // 生成选项：正确答案 + 干扰项
+  const allWords = [];
+  state.cy.nodes('[label="Word"]').forEach(n => {
+    const t = n.data('text');
+    if (t !== current.word) allWords.push(t);
+  });
+  shuffleArray(allWords);
+
+  const options = [current.word, ...allWords.slice(0, 3)];
+  shuffleArray(options);
+
+  const optionsDiv = document.createElement('div');
+  optionsDiv.className = 'mp-select-options';
+
+  options.forEach(opt => {
+    const btn = document.createElement('div');
+    btn.className = 'mp-select-option';
+    btn.textContent = opt;
+    btn.addEventListener('click', () => {
+      // 取消其他选中
+      optionsDiv.querySelectorAll('.mp-select-option').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      m._selectAnswers[current.word] = opt;
+    });
+    optionsDiv.appendChild(btn);
+  });
+
+  content.appendChild(optionsDiv);
+
+  // 下一步按钮
+  const nextBtn = document.createElement('button');
+  nextBtn.style.cssText = 'width:100%;padding:10px;font-size:14px;font-weight:600;background:var(--blue-dim);color:#fff;border:none;border-radius:8px;cursor:pointer;';
+  nextBtn.textContent = '下一题 →';
+  nextBtn.addEventListener('click', () => {
+    if (!m._selectAnswers[current.word]) {
+      $('mp-feedback').textContent = '请先选择一个答案';
+      $('mp-feedback').className = 'err';
+      return;
+    }
+    m._selectIndex++;
+    $('mp-feedback').textContent = '';
+    renderSelectQuestion();
+  });
+  content.appendChild(nextBtn);
+}
+
+function checkSelectResults() {
+  const m = state.memory;
+  const wordInfos = m._selectWords;
+  const answers = m._selectAnswers;
+
+  const content = $('mp-content');
+  content.innerHTML = '';
+
+  let allCorrect = true;
+
+  wordInfos.forEach(info => {
+    const row = document.createElement('div');
+    row.className = 'mp-match-row';
+
+    const cn = document.createElement('div');
+    cn.className = 'mp-match-cn';
+    cn.textContent = info.defCn;
+
+    const arrow = document.createElement('span');
+    arrow.className = 'mp-match-arrow';
+    arrow.textContent = '→';
+
+    const wordBtn = document.createElement('div');
+    wordBtn.className = 'mp-match-word';
+    wordBtn.textContent = answers[info.word] || '?';
+
+    if (answers[info.word] === info.word) {
+      wordBtn.classList.add('correct');
+      m.placementResults[info.word] = 'correct';
+    } else {
+      wordBtn.classList.add('wrong');
+      m.placementResults[info.word] = 'wrong';
+      allCorrect = false;
+    }
+
+    row.appendChild(cn);
+    row.appendChild(arrow);
+    row.appendChild(wordBtn);
+    content.appendChild(row);
+  });
+
+  handlePlacementResult(allCorrect);
+}
+
+// ========== 提交归位 ==========
+$('mp-submit').addEventListener('click', () => {
+  const m = state.memory;
+  const mode = m.placementMode;
+
+  if (mode === 'match') checkMatchResults();
+  else if (mode === 'fill') checkFillResults();
+  else if (mode === 'select') checkSelectResults();
+});
+
+function checkMatchResults() {
+  const assignments = state.memory._matchAssignments || {};
+  const layout = $('mp-content').querySelector('.mp-match-layout');
+  const columns = layout.querySelectorAll('.mp-match-column');
+  const defColumn = columns[0];
+  const wordColumn = columns[1];
+  let allCorrect = true;
+
+  // 检查每个定义
+  defColumn.querySelectorAll('.mp-match-def').forEach(defCard => {
+    const expectedWord = defCard.dataset.word;
+    const assignedWord = assignments[expectedWord];
+
+    if (!assignedWord) {
+      // 未分配
+      defCard.classList.add('wrong');
+      state.memory.placementResults[expectedWord] = 'wrong';
+      allCorrect = false;
+    } else if (assignedWord === expectedWord) {
+      // 正确
+      defCard.classList.add('correct');
+      defCard.classList.remove('assigned', 'selected');
+      state.memory.placementResults[expectedWord] = 'correct';
+    } else {
+      // 错误
+      defCard.classList.add('wrong');
+      defCard.classList.remove('assigned', 'selected');
+      state.memory.placementResults[expectedWord] = 'wrong';
+      allCorrect = false;
+    }
+  });
+
+  // 更新单词卡片状态
+  wordColumn.querySelectorAll('.mp-match-word').forEach(wordCard => {
+    const word = wordCard.dataset.word;
+    const expectedDef = defColumn.querySelector(`.mp-match-def[data-word="${word}"]`);
+
+    if (expectedDef && expectedDef.classList.contains('correct')) {
+      wordCard.classList.add('correct');
+    } else {
+      wordCard.classList.add('wrong');
+    }
+    wordCard.classList.remove('assigned');
+  });
+
+  handlePlacementResult(allCorrect);
+}
+
+function checkFillResults() {
+  const blanks = state.memory._fillBlanks || [];
+  let allCorrect = true;
+
+  blanks.forEach(({ input, answer }) => {
+    input.disabled = true;
+    if (input.value.trim().toLowerCase() === answer.toLowerCase()) {
+      input.classList.add('correct');
+      state.memory.placementResults[answer] = 'correct';
+    } else {
+      input.classList.add('wrong');
+      input.value = answer; // 显示正确答案
+      state.memory.placementResults[answer] = 'wrong';
+      allCorrect = false;
+    }
+  });
+
+  // 标记候选词
+  if (state.memory._fillCandidates) {
+    state.memory._fillCandidates.querySelectorAll('.mp-fill-candidate').forEach(chip => {
+      chip.classList.add('used');
+    });
+  }
+
+  handlePlacementResult(allCorrect);
+}
+
+// 处理归位结果
+function handlePlacementResult(allCorrect) {
+  const m = state.memory;
+
+  if (allCorrect) {
+    $('mp-feedback').textContent = '✓ 全部正确！';
+    $('mp-feedback').className = 'ok';
+    m.stats.correct++;
+
+    // 更新单词记忆度
+    const sentence = m.sentences[m.sentenceIndex];
+    if (sentence) {
+      sentence.words.forEach(w => {
+        const node = state.cy.getElementById('word:' + w);
+        if (node.length) node.data('memory_strength', 1.0);
+        if (state.cy) state.cy.style().update();
+      });
+    }
+
+    setTimeout(async () => {
+      $('memory-placement-overlay').classList.add('hidden');
+      m.phase = 'idle';
+      m.sentenceIndex++;
+      m.wordIndex = 0;
+
+      if (m.sentenceIndex >= m.sentences.length) {
+        showMemoryDone();
+      } else {
+        await revealPhase();
+      }
+    }, 1000);
+  } else {
+    $('mp-feedback').textContent = '✗ 部分错误，显示正确答案后重新记忆';
+    $('mp-feedback').className = 'err';
+    m.stats.wrong++;
+
+    // 收集错误的单词
+    const wrongWords = Object.entries(m.placementResults)
+      .filter(([_, v]) => v === 'wrong')
+      .map(([w, _]) => w);
+
+    setTimeout(async () => {
+      $('memory-placement-overlay').classList.add('hidden');
+      m.phase = 'idle';
+
+      // 只重新记忆错误的单词
+      m.wrongWords = wrongWords;
+      m.stats.rounds++;
+
+      // 为错误单词重新进入揭示阶段
+      await retryWrongWords();
+    }, 2000);
+  }
+}
+
+// 重新记忆错误的单词
+async function retryWrongWords() {
+  const m = state.memory;
+  const wrongWords = [...m.wrongWords];
+  m.wrongWords = [];
+
+  // 创建一个临时"例句"只包含错误单词
+  const tempSentence = {
+    node: null,
+    words: wrongWords,
+    translation: '',
+    sentenceText: '',
+  };
+
+  // 替换当前句子的单词列表
+  const origSentence = m.sentences[m.sentenceIndex];
+  const origWords = [...origSentence.words];
+
+  // 用错误单词替换
+  m.sentences[m.sentenceIndex].words = wrongWords;
+  m.wordIndex = 0;
+
+  // 逐个揭示错误单词
+  for (const word of wrongWords) {
+    const wordNode = state.cy.getElementById('word:' + word);
+    const defCn = wordNode.length ? (wordNode.data('definition_cn') || '') : '';
+    const defEn = wordNode.length ? (wordNode.data('definition_en') || '') : '';
+
+    m.currentCard = {
+      word, defCn, defEn,
+      sentenceText: origSentence.sentenceText,
+      translation: origSentence.translation,
+      node: wordNode,
+    };
+
+    if (wordNode.length) {
+      wordNode.addClass('memory-highlight');
+      state.cy.animate({ center: { eles: wordNode }, zoom: 1.2 }, { duration: 300 });
+    }
+
+    m.phase = 'revealing';
+    $('memory-card-overlay').classList.remove('hidden');
+    $('memory-card').classList.remove('flipped');
+    $('mc-progress').textContent = `重新记忆错误单词`;
+
+    await revealLetters(word);
+
+    m.phase = 'showing';
+    $('memory-card').classList.add('flipped');
+    showCardBack(m.currentCard);
+
+    // 等待用户点击"下一个"
+    await new Promise(resolve => {
+      const checkInterval = setInterval(() => {
+        if (m.phase !== 'showing') {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 100);
+    });
+  }
+
+  // 恢复原始单词列表，重新归位
+  m.sentences[m.sentenceIndex].words = origWords;
+  m.wordIndex = origWords.length; // 跳过揭示阶段，直接进入归位
+  await placementPhase();
+}
+
+// 显示记忆完成面板
+function showMemoryDone() {
+  const m = state.memory;
+  m.phase = 'done';
+
+  const total = m.stats.total + m.stats.wrong;
+  const correct = m.stats.correct;
+  const rounds = m.stats.rounds + 1;
+
+  $('md-title').textContent = '记忆完成！';
+  $('md-stats').innerHTML =
+    `共记忆 <b>${total}</b> 个单词<br>` +
+    `正确 <b style="color:var(--good)">${correct}</b> 个 · ` +
+    `错误 <b style="color:var(--critical)">${m.stats.wrong}</b> 个<br>` +
+    `经历了 <b>${rounds}</b> 轮记忆`;
+
+  $('memory-done-overlay').classList.remove('hidden');
+
+  // 清理高亮
+  if (state.cy) {
+    state.cy.elements().removeClass('memory-highlight');
+  }
+}
+
+// 完成面板返回按钮
+$('md-back').addEventListener('click', () => {
+  $('memory-done-overlay').classList.add('hidden');
+  state.memory.phase = 'idle';
+  state.memory.currentCard = null;
+});
+
+// 记忆模式卡片样式补充
+const memoryStyle = document.createElement('style');
+memoryStyle.textContent = `
+  node.memory-highlight {
+    background-color: #cde2fb !important;
+    border-width: 3px !important;
+    border-color: #ffffff !important;
+  }
+`;
+document.head.appendChild(memoryStyle);
 
 loadGraph().catch((e) => {
   $('loading').textContent = '加载失败：请确认后端服务已启动（uvicorn app.main:app）';
