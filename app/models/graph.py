@@ -138,6 +138,9 @@ GET_CATEGORY_STATS = (
     "OPTIONAL MATCH (w:Word {user_id: $user_id})-[:BELONGS_TO]->(c) "
     "OPTIONAL MATCH (s:Sentence {user_id: $user_id})-[:BELONGS_TO]->(c) "
     "RETURN c.name AS name, c.description AS description, "
-    "count(DISTINCT w) AS word_count, count(DISTINCT s) AS sentence_count "
+    "count(DISTINCT w) AS word_count, count(DISTINCT s) AS sentence_count, "
+    "count(DISTINCT CASE WHEN w.memory_strength > 0.9 THEN w END) AS memory_high_count, "
+    "count(DISTINCT CASE WHEN w.memory_strength <= 0.9 AND w.memory_strength > 0 THEN w END) AS memory_mid_count, "
+    "count(DISTINCT CASE WHEN w.memory_strength = 0 THEN w END) AS memory_zero_count "
     "ORDER BY name"
 )

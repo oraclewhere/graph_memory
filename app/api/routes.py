@@ -76,6 +76,9 @@ def categories(user: User = Depends(get_current_user)) -> dict:
                     "description": r.get("description") or "",
                     "word_count": r.get("word_count", 0),
                     "sentence_count": r.get("sentence_count", 0),
+                    "memory_high_count": r.get("memory_high_count", 0),
+                    "memory_mid_count": r.get("memory_mid_count", 0),
+                    "memory_zero_count": r.get("memory_zero_count", 0),
                 }
                 for r in rows
             ]

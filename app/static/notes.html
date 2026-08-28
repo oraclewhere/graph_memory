@@ -93,6 +93,11 @@
   .note-name { font-size: 15px; font-weight: 600; }
   .note-desc { font-size: 12px; color: var(--ink-3); }
   .note-meta { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+  .note-memory { font-size: 11px; color: var(--ink-3); margin-top: 4px; }
+  .note-memory span { margin-right: 8px; }
+  .mem-high { color: var(--good); }
+  .mem-mid { color: var(--orange); }
+  .mem-zero { color: var(--critical); }
   .empty { font-size: 13px; color: var(--ink-3); }
 
   /* 顶部栏：用户信息 + 退出 */
@@ -232,8 +237,15 @@ async function loadCategories() {
     const meta = document.createElement('div');
     meta.className = 'note-meta';
     meta.textContent = c.word_count + ' 词 · ' + c.sentence_count + ' 例句';
+    const memory = document.createElement('div');
+    memory.className = 'note-memory';
+    memory.innerHTML =
+      '<span class="mem-high">● >90%: ' + (c.memory_high_count || 0) + '</span>' +
+      '<span class="mem-mid">● ≤90%: ' + (c.memory_mid_count || 0) + '</span>' +
+      '<span class="mem-zero">● 未记: ' + (c.memory_zero_count || 0) + '</span>';
     item.appendChild(main);
     item.appendChild(meta);
+    item.appendChild(memory);
     notes.appendChild(item);
   }
 }
